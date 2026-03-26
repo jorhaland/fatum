@@ -3,6 +3,14 @@ package com.fatum.data.db.dao
 import androidx.room.*
 import com.fatum.data.db.entities.*
 import kotlinx.coroutines.flow.Flow
+import androidx.annotation.Keep
+import androidx.room.ColumnInfo
+
+@Keep
+data class DateCount(
+    @ColumnInfo(name = "date_string") val date_string: String,
+    @ColumnInfo(name = "count") val count: Int
+)
 
 // ─────────────────────────────────────────────────────────────────────────────
 // LogDao  –  RF-1.1, RF-1.4, RF-1.5, RF-1.6
@@ -49,8 +57,6 @@ interface LogDao {
     @Query("SELECT date_string, COUNT(*) as count FROM logs GROUP BY date_string")
     suspend fun getLogCountsPerDay(): List<DateCount>
 }
-
-data class DateCount(val date_string: String, val count: Int)
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MoodDao  –  RF-1.3
