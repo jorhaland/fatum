@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+    <cloud-backup>
+        <!-- Exclude all: FATUM manages its own encrypted backup via Drive API -->
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </cloud-backup>
+    <device-transfer>
+        <include domain="database" path="fatum.db" />
+        <include domain="sharedpref" path="fatum_prefs.preferences_pb" />
+    </device-transfer>
+</data-extraction-rules>

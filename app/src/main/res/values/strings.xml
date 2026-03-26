@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">FATUM</string>
+    <string name="app_description">Tu segundo cerebro. Sin fricción.</string>
+
+    <!-- Navigation -->
+    <string name="nav_home">Diario</string>
+    <string name="nav_habits">Hábitos</string>
+    <string name="nav_planner">Agenda</string>
+    <string name="nav_goals">Metas</string>
+    <string name="nav_focus">Enfoque</string>
+    <string name="nav_analytics">Análisis</string>
+
+    <!-- Home / Logging -->
+    <string name="hint_log_input">¿Qué está pasando? Usa #etiquetas…</string>
+    <string name="label_today">Hoy</string>
+    <string name="label_yesterday">Ayer</string>
+    <string name="label_on_this_day">Un día como hoy</string>
+    <string name="label_mood">Humor</string>
+    <string name="label_mood_question">¿Cómo estás hoy?</string>
+    <string name="label_activity_year">Actividad del año</string>
+
+    <!-- Habits -->
+    <string name="label_streak">Racha</string>
+    <string name="label_current_streak">Racha actual</string>
+    <string name="label_max_streak">Récord</string>
+    <string name="label_new_habit">Nuevo hábito</string>
+    <string name="label_retroactive">Registro retroactivo</string>
+    <string name="notif_streak_title">⚠️ Racha en peligro</string>
+    <string name="notif_streak_body">Llevas %1$d días seguidos. ¡No pierdas tu racha!</string>
+
+    <!-- Focus / Deep Work -->
+    <string name="label_focus_active">SESIÓN ACTIVA</string>
+    <string name="label_focus_ready">LISTO</string>
+    <string name="label_focus_done">COMPLETADO ✓</string>
+    <string name="label_interrupt">Interrumpir sesión</string>
+    <string name="label_interrupt_warning">La sesión se marcará como fallida.</string>
+    <string name="blocker_title">Sesión en curso</string>
+    <string name="blocker_body">Estás en modo Deep Work. Mantén el foco.</string>
+
+    <!-- Goals -->
+    <string name="label_new_goal">Nueva meta</string>
+    <string name="label_new_task">Nueva tarea</string>
+    <string name="label_progress">Progreso</string>
+    <string name="label_orphaned_tasks">Tareas sueltas</string>
+
+    <!-- Analytics -->
+    <string name="label_weekly_summary">Resumen semanal</string>
+    <string name="label_avg_mood">Humor medio</string>
+    <string name="label_deep_work">Deep Work</string>
+    <string name="label_correlation">Correlación hábito–humor</string>
+
+    <!-- General -->
+    <string name="action_save">Guardar</string>
+    <string name="action_cancel">Cancelar</string>
+    <string name="action_delete">Eliminar</string>
+    <string name="action_edit">Editar</string>
+    <string name="action_create">Crear</string>
+    <string name="label_priority">Prioridad</string>
+    <string name="label_frequency">Frecuencia</string>
+</resources>

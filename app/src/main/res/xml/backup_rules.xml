@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    FATUM stores all user data locally in Room (SQLite).
+    We DISABLE Android Auto-Backup (allowBackup=false in Manifest) because
+    backup is handled manually via WorkManager → Google Drive (RNF-5).
+    These rules exist only to satisfy the build requirement.
+-->
+<full-backup-content>
+    <!-- Exclude DB files from system backup (we manage our own) -->
+    <exclude domain="database" path="." />
+    <exclude domain="sharedpref" path="." />
+</full-backup-content>
