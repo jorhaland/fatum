@@ -20,6 +20,14 @@ import androidx.lifecycle.*
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.fatum.presentation.theme.FatumColors
 import com.fatum.presentation.theme.FatumTheme
+import androidx.savedstate.SavedStateRegistryOwner
+import androidx.savedstate.SavedStateRegistryController
+import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import androidx.lifecycle.LifecycleRegistry
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.setViewTreeLifecycleOwner
+import androidx.lifecycle.setViewTreeViewModelStoreOwner
 
 // ─────────────────────────────────────────────────────────────────────────────
 // AppBlockerOverlayService  –  RF-5.2 / RF-5.3 / RF-5.4
@@ -76,22 +84,38 @@ class AppBlockerOverlayService : Service() {
 
     /** Shows the intervention screen over a blocked app (RF-5.3). */
     fun showOverlay(blockedAppName: String) {
-        if (overlayView != null) return  // Already showing
+        if (overlayView != null) return
         val params = WindowManager.LayoutParams(
             MATCH_PARENT, MATCH_PARENT,
             TYPE_APPLICATION_OVERLAY,
             FLAG_NOT_FOCUSABLE or FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT
         )
+
+        // Crear un Owner sintético para que Compose no crashee fuera de una Activity
+        val lifecycleOwner = object : LifecycleOwner, SavedStateRegistryOwner {
+            private val lifecycleRegistry = LifecycleRegistry(this)
+            private val savedStateRegistryController = SavedStateRegistryController.create(this)
+            override val savedStateRegistry get() = savedStateRegistryController.savedStateRegistry
+            override val lifecycle get() = lifecycleRegistry
+
+            init {
+                savedStateRegistryController.performRestore(null)
+                lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
+                lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_START)
+                lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
+            }
+        }
+
         overlayView = ComposeView(this).apply {
-            setViewTreeLifecycleOwner(ProcessLifecycleOwner.get())
+            setViewTreeLifecycleOwner(lifecycleOwner)
+            setViewTreeSavedStateRegistryOwner(lifecycleOwner)
             setViewTreeViewModelStoreOwner(null)
             setContent {
                 FatumTheme(darkTheme = true) {
                     BlockerOverlayContent(
                         appName = blockedAppName,
                         onInterrupt = {
-                            // RF-5.4 – user surrenders; stop the session
                             sendBroadcast(Intent("com.fatum.ACTION_SESSION_INTERRUPTED"))
                             hideOverlay()
                             stopBlocking()

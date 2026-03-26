@@ -161,7 +161,7 @@ interface GoalDao {
         UPDATE goals
         SET progress_percentage = (
             SELECT CAST(SUM(CASE WHEN is_completed = 1 THEN 1 ELSE 0 END) AS FLOAT) 
-                   / MAX(COUNT(*), 1) * 100
+                   / (CASE WHEN COUNT(*) = 0 THEN 1 ELSE COUNT(*) END) * 100
             FROM tasks 
             WHERE goal_id = :goalId
         )
