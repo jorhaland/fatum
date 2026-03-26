@@ -51,3 +51,8 @@
 # ── General ───────────────────────────────────────────────────────────────
 -keepattributes SourceFile,LineNumberTable
 -keep public class * extends java.lang.Exception
+
+# Mantener modelos de datos de Room y Google API
+-keep class com.fatum.data.db.entities.** { *; }
+-keep class com.google.api.services.drive.** { *; }
+-keep class com.google.api.client.** { *; }
