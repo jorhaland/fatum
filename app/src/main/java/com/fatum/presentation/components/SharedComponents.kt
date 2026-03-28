@@ -156,22 +156,36 @@ fun SectionHeader(title: String, modifier: Modifier = Modifier) {
 // ─────────────────────────────────────────────────────────────────────────────
 // FatumCard – consistent surface card
 // ─────────────────────────────────────────────────────────────────────────────
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FatumCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    val mod = if (onClick != null) modifier.clickable(onClick = onClick) else modifier
-    Card(
-        modifier = mod,
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = FatumColors.Surface)
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            content = content
-        )
+    if (onClick != null) {
+        Card(
+            onClick = onClick,
+            modifier = modifier,
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = FatumColors.Surface)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                content = content
+            )
+        }
+    } else {
+        Card(
+            modifier = modifier,
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = FatumColors.Surface)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                content = content
+            )
+        }
     }
 }
 
