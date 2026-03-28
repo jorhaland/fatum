@@ -43,17 +43,6 @@
         android:theme="@style/Theme.Fatum"
         tools:targetApi="31">
 
-        <provider
-            android:name="androidx.startup.InitializationProvider"
-            android:authorities="${applicationId}.androidx-startup"
-            android:exported="false"
-            tools:node="merge">
-            <meta-data
-                android:name="androidx.work.WorkManagerInitializer"
-                android:value="androidx.startup"
-                tools:node="remove" />
-        </provider>
-
         <!-- ── Main Activity ────────────────────────────────────────────── -->
         <activity
             android:name=".presentation.MainActivity"
@@ -113,6 +102,31 @@
         <meta-data
             android:name="com.google.android.gms.version"
             android:value="@integer/google_play_services_version" />
+
+        <!--
+            ══ FIX BUG 1: WorkManager startup crash ══════════════════════════
+            FatumApplication implements Configuration.Provider to supply a
+            custom HiltWorkerFactory. The androidx.startup library (bundled
+            with WorkManager) runs WorkManagerInitializer inside a
+            ContentProvider.onCreate(), which fires BEFORE Application.onCreate()
+            and therefore BEFORE Hilt injects workerFactory.
+            Accessing the lateinit workerFactory at that point throws
+            UninitializedPropertyAccessException and crashes the app.
+
+            Fix: disable the automatic startup initializer so WorkManager
+            initializes lazily (via Configuration.Provider) only after Hilt
+            has completed its injection in Application.onCreate().
+        -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
 
     </application>
 </manifest>

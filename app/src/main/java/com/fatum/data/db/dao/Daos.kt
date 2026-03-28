@@ -3,14 +3,6 @@ package com.fatum.data.db.dao
 import androidx.room.*
 import com.fatum.data.db.entities.*
 import kotlinx.coroutines.flow.Flow
-import androidx.annotation.Keep
-import androidx.room.ColumnInfo
-
-@Keep
-data class DateCount(
-    @ColumnInfo(name = "date_string") val date_string: String,
-    @ColumnInfo(name = "count") val count: Int
-)
 
 // ─────────────────────────────────────────────────────────────────────────────
 // LogDao  –  RF-1.1, RF-1.4, RF-1.5, RF-1.6
@@ -57,6 +49,8 @@ interface LogDao {
     @Query("SELECT date_string, COUNT(*) as count FROM logs GROUP BY date_string")
     suspend fun getLogCountsPerDay(): List<DateCount>
 }
+
+data class DateCount(val date_string: String, val count: Int)
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MoodDao  –  RF-1.3
@@ -136,6 +130,13 @@ interface HabitDao {
     /** Update cached streak values without a full entity update. */
     @Query("UPDATE habits SET current_streak = :current, max_streak = :max WHERE id = :id")
     suspend fun updateStreaks(id: Int, current: Int, max: Int)
+
+    /**
+     * Returns the highest current_streak across all active habits.
+     * Used by FatumWidget which cannot collect a Flow — needs a direct suspend query.
+     */
+    @Query("SELECT COALESCE(MAX(current_streak), 0) FROM habits WHERE is_active = 1")
+    suspend fun getTopStreakDirect(): Int
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -167,7 +168,7 @@ interface GoalDao {
         UPDATE goals
         SET progress_percentage = (
             SELECT CAST(SUM(CASE WHEN is_completed = 1 THEN 1 ELSE 0 END) AS FLOAT) 
-                   / (CASE WHEN COUNT(*) = 0 THEN 1 ELSE COUNT(*) END) * 100
+                   / MAX(COUNT(*), 1) * 100
             FROM tasks 
             WHERE goal_id = :goalId
         )

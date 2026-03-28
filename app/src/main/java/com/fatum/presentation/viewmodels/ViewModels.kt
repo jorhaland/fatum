@@ -1,10 +1,22 @@
 package com.fatum.presentation.viewmodels
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.fatum.data.db.entities.*
 import com.fatum.data.repository.*
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential
+import com.google.api.client.http.javanet.NetHttpTransport
+import com.google.api.client.json.gson.GsonFactory
+import com.google.api.client.util.DateTime
+import com.google.api.services.calendar.Calendar
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.time.*
@@ -15,55 +27,45 @@ private val DATE_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd")
 private fun today() = LocalDate.now().format(DATE_FMT)
 
 // ─────────────────────────────────────────────────────────────────────────────
-// HomeViewModel  –  Micro-logging, mood, heat-map (RF-1.x, RF-6.1)
+// HomeViewModel  –  Logging, heat-map  (RF-1.x, RF-6.1)
+// Mood selector removed per user request. MoodRepository kept for analytics.
 // ─────────────────────────────────────────────────────────────────────────────
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val logRepo: LogRepository,
-    private val moodRepo: MoodRepository,
     private val habitRepo: HabitRepository
 ) : ViewModel() {
 
-    /** Raw input text in the quick-add field. */
     private val _inputText = MutableStateFlow("")
     val inputText: StateFlow<String> = _inputText.asStateFlow()
 
-    /** Active tag filter (null = show all). */
     private val _activeTag = MutableStateFlow<String?>(null)
     val activeTag: StateFlow<String?> = _activeTag.asStateFlow()
 
-    /** Full timeline or filtered by tag. */
     val logs: StateFlow<List<LogEntity>> = _activeTag
         .flatMapLatest { tag ->
             if (tag == null) logRepo.observeAll() else logRepo.observeByTag(tag)
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    val todayMood: StateFlow<DailyMoodEntity?> = moodRepo.observeToday()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
-
-    /** Time-capsule entries (RF-1.5). */
     val timeCapsule: StateFlow<List<LogEntity>> = logRepo.observeOnThisDay()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    /** Heat-map data: map of "YYYY-MM-DD" → intensity count (RF-6.1). */
     private val _heatMap = MutableStateFlow<Map<String, Int>>(emptyMap())
     val heatMap: StateFlow<Map<String, Int>> = _heatMap.asStateFlow()
 
     init { loadHeatMap() }
 
     private fun loadHeatMap() = viewModelScope.launch {
-        val logCounts = logRepo.getLogCountsPerDay().associate { it.date_string to it.count }
+        val logCounts   = logRepo.getLogCountsPerDay().associate { it.date_string to it.count }
         val habitCounts = habitRepo.getExecutionCountsPerDay().associate { it.date_string to it.count }
-        val merged = (logCounts.keys + habitCounts.keys).associateWith { date ->
-            (logCounts[date] ?: 0) + (habitCounts[date] ?: 0)
+        _heatMap.value  = (logCounts.keys + habitCounts.keys).associateWith { d ->
+            (logCounts[d] ?: 0) + (habitCounts[d] ?: 0)
         }
-        _heatMap.value = merged
     }
 
     fun onInputChange(text: String) { _inputText.value = text }
 
-    /** Parses #hashtags from the content and saves the log. */
     fun submitLog() = viewModelScope.launch {
         val text = _inputText.value.trim()
         if (text.isBlank()) return@launch
@@ -73,10 +75,9 @@ class HomeViewModel @Inject constructor(
         loadHeatMap()
     }
 
-    fun setMood(score: Int) = viewModelScope.launch { moodRepo.setMood(score) }
     fun setTagFilter(tag: String?) { _activeTag.value = tag }
-    fun deleteLog(log: LogEntity) = viewModelScope.launch { logRepo.delete(log) }
-    fun updateLog(log: LogEntity) = viewModelScope.launch { logRepo.update(log) }
+    fun deleteLog(log: LogEntity)  = viewModelScope.launch { logRepo.delete(log) }
+    fun updateLog(log: LogEntity)  = viewModelScope.launch { logRepo.update(log) }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -90,28 +91,10 @@ class HabitsViewModel @Inject constructor(
     val habits: StateFlow<List<HabitEntity>> = repo.observeActive()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    /** Selected calendar date for retroactive logging (RF-2.2). */
     private val _selectedDate = MutableStateFlow(today())
     val selectedDate: StateFlow<String> = _selectedDate.asStateFlow()
 
-    /** IDs of habits completed on the selected date. */
-    private val _completedIds = MutableStateFlow<Set<Int>>(emptySet())
-    val completedIds: StateFlow<Set<Int>> = _completedIds.asStateFlow()
-
-    init { refreshCompletedForDate() }
-
-    fun selectDate(date: String) {
-        _selectedDate.value = date
-        refreshCompletedForDate()
-    }
-
-    private fun refreshCompletedForDate() = viewModelScope.launch {
-        // Collect single snapshot of executions for the selected date
-        repo.observeActive().first().forEach { habit ->
-            // handled via observeExecutions below
-        }
-        _completedIds.value = emptySet() // reset; UI re-subscribes per-habit
-    }
+    fun selectDate(date: String) { _selectedDate.value = date }
 
     fun toggleHabit(habitId: Int) = viewModelScope.launch {
         repo.toggleExecution(habitId, _selectedDate.value)
@@ -126,15 +109,23 @@ class HabitsViewModel @Inject constructor(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PlannerViewModel  –  RF-3.x, RF-4.x (agenda unified view)
+// PlannerViewModel  –  RF-3.x  (agenda + Google Calendar sync)
 // ─────────────────────────────────────────────────────────────────────────────
 @HiltViewModel
 class PlannerViewModel @Inject constructor(
     private val calendarRepo: CalendarRepository,
-    private val goalRepo: GoalRepository
+    private val goalRepo: GoalRepository,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
-    /** Currently displayed day in the agenda. */
+    enum class SyncState { IDLE, SYNCING, SUCCESS, ERROR }
+
+    private val _syncState = MutableStateFlow(SyncState.IDLE)
+    val syncState: StateFlow<SyncState> = _syncState.asStateFlow()
+
+    private val _syncError = MutableStateFlow<String?>(null)
+    val syncError: StateFlow<String?> = _syncError.asStateFlow()
+
     private val _selectedDate = MutableStateFlow(LocalDate.now())
     val selectedDate: StateFlow<LocalDate> = _selectedDate.asStateFlow()
 
@@ -156,23 +147,68 @@ class PlannerViewModel @Inject constructor(
 
     fun selectDate(date: LocalDate) { _selectedDate.value = date }
 
-    fun addEvent(
-        title: String,
-        startTs: Long,
-        endTs: Long,
-        rrule: String?,
-        priority: Int,
-        goalId: Int?
-    ) = viewModelScope.launch {
-        calendarRepo.addLocalEvent(title, startTs, endTs, rrule, priority, goalId)
-    }
+    fun addEvent(title: String, startTs: Long, endTs: Long, rrule: String?, priority: Int, goalId: Int?) =
+        viewModelScope.launch { calendarRepo.addLocalEvent(title, startTs, endTs, rrule, priority, goalId) }
 
-    fun deleteEvent(event: CalendarEventEntity) = viewModelScope.launch {
-        calendarRepo.deleteEvent(event)
-    }
+    fun deleteEvent(event: CalendarEventEntity) = viewModelScope.launch { calendarRepo.deleteEvent(event) }
+    fun updateEvent(event: CalendarEventEntity) = viewModelScope.launch { calendarRepo.updateEvent(event) }
 
-    fun updateEvent(event: CalendarEventEntity) = viewModelScope.launch {
-        calendarRepo.updateEvent(event)
+    /** Full sync from Google Calendar → Room. Requires prior Google Sign-In. */
+    fun syncCalendar() = viewModelScope.launch(Dispatchers.IO) {
+        if (_syncState.value == SyncState.SYNCING) return@launch
+        _syncState.value  = SyncState.SYNCING
+        _syncError.value  = null
+        try {
+            val account = GoogleSignIn.getLastSignedInAccount(context)
+                ?: error("No hay cuenta de Google conectada. Ve a Ajustes para iniciar sesión.")
+
+            val credential = GoogleAccountCredential.usingOAuth2(
+                context,
+                listOf("https://www.googleapis.com/auth/calendar.readonly")
+            ).apply { selectedAccount = account.account }
+
+            val service = Calendar.Builder(
+                NetHttpTransport(),
+                GsonFactory.getDefaultInstance(),
+                credential
+            ).setApplicationName("FATUM").build()
+
+            val now   = DateTime(System.currentTimeMillis())
+            val limit = DateTime(System.currentTimeMillis() + 60L * 24 * 60 * 60 * 1000) // 60 days
+
+            val items = service.events().list("primary")
+                .setMaxResults(500)
+                .setTimeMin(now)
+                .setTimeMax(limit)
+                .setSingleEvents(true)
+                .setOrderBy("startTime")
+                .execute()
+                .items ?: emptyList()
+
+            val entities = items.mapNotNull { ev ->
+                val startMs = ev.start?.dateTime?.value ?: ev.start?.date?.value ?: return@mapNotNull null
+                val endMs   = ev.end?.dateTime?.value   ?: ev.end?.date?.value   ?: return@mapNotNull null
+                CalendarEventEntity(
+                    gcalEventId    = ev.id,
+                    title          = ev.summary ?: "(Sin título)",
+                    startTimestamp = startMs,
+                    endTimestamp   = endMs,
+                    recurrenceRule = ev.recurrence?.firstOrNull(),
+                    priorityStars  = 1,
+                    isFromGcal     = true
+                )
+            }
+
+            calendarRepo.replaceGcalEvents(entities)
+            _syncState.value = SyncState.SUCCESS
+            delay(3_000)
+            _syncState.value = SyncState.IDLE
+        } catch (e: Exception) {
+            _syncError.value  = e.message ?: "Error desconocido"
+            _syncState.value  = SyncState.ERROR
+            delay(6_000)
+            _syncState.value  = SyncState.IDLE
+        }
     }
 }
 
@@ -184,7 +220,7 @@ class GoalsViewModel @Inject constructor(
     private val repo: GoalRepository
 ) : ViewModel() {
 
-    val goals: StateFlow<List<GoalEntity>> = repo.observeActive()
+    val goals: StateFlow<List<GoalEntity>>         = repo.observeActive()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val orphanedTasks: StateFlow<List<TaskEntity>> = repo.observeOrphanedTasks()
@@ -195,14 +231,12 @@ class GoalsViewModel @Inject constructor(
     fun addGoal(title: String, desc: String?, priority: Int, deadline: Long?) =
         viewModelScope.launch { repo.addGoal(title, desc, priority, deadline) }
 
-    fun deleteGoal(goal: GoalEntity) = viewModelScope.launch { repo.deleteGoal(goal) }
-
+    fun deleteGoal(goal: GoalEntity)  = viewModelScope.launch { repo.deleteGoal(goal) }
+    fun updateGoal(goal: GoalEntity)  = viewModelScope.launch { repo.updateGoal(goal) }
     fun addTask(title: String, goalId: Int?, priority: Int, due: Long?) =
         viewModelScope.launch { repo.addTask(title, goalId, priority, due) }
-
-    fun toggleTask(task: TaskEntity) = viewModelScope.launch { repo.toggleTask(task) }
-    fun deleteTask(task: TaskEntity) = viewModelScope.launch { repo.deleteTask(task) }
-    fun updateGoal(goal: GoalEntity) = viewModelScope.launch { repo.updateGoal(goal) }
+    fun toggleTask(task: TaskEntity)  = viewModelScope.launch { repo.toggleTask(task) }
+    fun deleteTask(task: TaskEntity)  = viewModelScope.launch { repo.deleteTask(task) }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -213,16 +247,14 @@ class FocusViewModel @Inject constructor(
     private val repo: FocusRepository
 ) : ViewModel() {
 
-    /** Timer state machine. */
-    enum class TimerState { IDLE, RUNNING, PAUSED, FINISHED }
+    enum class TimerState { IDLE, RUNNING, FINISHED }
 
-    private val _state = MutableStateFlow(TimerState.IDLE)
+    private val _state         = MutableStateFlow(TimerState.IDLE)
     val state: StateFlow<TimerState> = _state.asStateFlow()
 
-    private val _durationMinutes = MutableStateFlow(25) // default Pomodoro
+    private val _durationMinutes = MutableStateFlow(25)
     val durationMinutes: StateFlow<Int> = _durationMinutes.asStateFlow()
 
-    /** Remaining milliseconds. Updated every second by the service. */
     private val _remainingMs = MutableStateFlow(25 * 60 * 1000L)
     val remainingMs: StateFlow<Long> = _remainingMs.asStateFlow()
 
@@ -233,36 +265,36 @@ class FocusViewModel @Inject constructor(
 
     fun setDuration(minutes: Int) {
         _durationMinutes.value = minutes
-        _remainingMs.value = minutes * 60 * 1000L
+        _remainingMs.value     = minutes * 60 * 1000L
     }
 
     fun startSession() {
-        sessionStartTs = System.currentTimeMillis()
+        sessionStartTs     = System.currentTimeMillis()
         _remainingMs.value = _durationMinutes.value * 60 * 1000L
-        _state.value = TimerState.RUNNING
+        _state.value       = TimerState.RUNNING
     }
 
     fun tick(deltaMs: Long) {
-        val remaining = (_remainingMs.value - deltaMs).coerceAtLeast(0)
-        _remainingMs.value = remaining
-        if (remaining == 0L) finishSession(completed = true)
+        val rem = (_remainingMs.value - deltaMs).coerceAtLeast(0L)
+        _remainingMs.value = rem
+        if (rem == 0L) finishSession(completed = true)
     }
 
     fun interruptSession() = viewModelScope.launch {
-        _state.value = TimerState.IDLE
-        val endTs = System.currentTimeMillis()
-        val elapsed = ((endTs - sessionStartTs) / 60_000).toInt()
+        _state.value  = TimerState.IDLE
+        val endTs     = System.currentTimeMillis()
+        val elapsed   = ((endTs - sessionStartTs) / 60_000).toInt().coerceAtLeast(1)
         repo.saveSession(sessionStartTs, endTs, elapsed, completed = false)
     }
 
     fun finishSession(completed: Boolean) = viewModelScope.launch {
-        _state.value = TimerState.FINISHED
-        val endTs = System.currentTimeMillis()
+        _state.value  = TimerState.FINISHED
+        val endTs     = System.currentTimeMillis()
         repo.saveSession(sessionStartTs, endTs, _durationMinutes.value, completed)
     }
 
     fun reset() {
-        _state.value = TimerState.IDLE
+        _state.value       = TimerState.IDLE
         _remainingMs.value = _durationMinutes.value * 60 * 1000L
     }
 }
@@ -290,17 +322,10 @@ class AnalyticsViewModel @Inject constructor(
     val recentSessions: StateFlow<List<FocusSessionEntity>> = focusRepo.observeAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    /** Selected habit for correlation chart (RF-6.2). */
-    private val _correlationHabitId = MutableStateFlow<Int?>(null)
-    val correlationHabitId: StateFlow<Int?> = _correlationHabitId.asStateFlow()
-
-    fun selectCorrelationHabit(id: Int) { _correlationHabitId.value = id }
-
-    /** Weekly summary report data holder (RF-6.3). */
     data class WeeklySummary(
         val weekRange: String,
         val avgMood: Float,
-        val bestStreak: Pair<String, Int>, // habit name to streak
+        val bestStreak: Pair<String, Int>,
         val deepWorkMinutes: Int,
         val goalProgress: List<Pair<String, Float>>
     )
@@ -309,31 +334,99 @@ class AnalyticsViewModel @Inject constructor(
     val weeklySummary: StateFlow<WeeklySummary?> = _weeklySummary.asStateFlow()
 
     fun generateWeeklySummary() = viewModelScope.launch {
-        val today = LocalDate.now()
+        val today  = LocalDate.now()
         val monday = today.minusDays(today.dayOfWeek.value.toLong() - 1)
         val sunday = monday.plusDays(6)
-
-        val from = monday.format(DATE_FMT)
-        val to = sunday.format(DATE_FMT)
+        val from   = monday.format(DATE_FMT)
+        val to     = sunday.format(DATE_FMT)
         val fromTs = monday.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
-        val toTs = sunday.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val toTs   = sunday.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
 
-        val avgMood = moodRepo.averageInRange(from, to) ?: 0f
-        val deepWork = focusRepo.completedMinutesInRange(fromTs, toTs)
-
-        val habits = habitRepo.observeActive().first()
-        val bestStreak = habits.maxByOrNull { it.currentStreak }
-            ?.let { it.name to it.currentStreak } ?: ("—" to 0)
-
-        val goals = goalRepo.observeAll().first()
-        val goalProgress = goals.map { it.title to it.progressPercentage }
+        val avgMood   = moodRepo.averageInRange(from, to) ?: 0f
+        val deepWork  = focusRepo.completedMinutesInRange(fromTs, toTs)
+        val habits    = habitRepo.observeActive().first()
+        val bestStreak = habits.maxByOrNull { it.currentStreak }?.let { it.name to it.currentStreak } ?: ("—" to 0)
+        val goals     = goalRepo.observeAll().first()
 
         _weeklySummary.value = WeeklySummary(
-            weekRange = "$from → $to",
-            avgMood = avgMood,
-            bestStreak = bestStreak,
+            weekRange       = "$from → $to",
+            avgMood         = avgMood,
+            bestStreak      = bestStreak,
             deepWorkMinutes = deepWork,
-            goalProgress = goalProgress
+            goalProgress    = goals.map { it.title to it.progressPercentage }
         )
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SettingsViewModel  –  Google Sign-In + Drive backup
+// ─────────────────────────────────────────────────────────────────────────────
+@HiltViewModel
+class SettingsViewModel @Inject constructor(
+    @ApplicationContext private val context: Context
+) : ViewModel() {
+
+    data class AccountState(
+        val isSignedIn: Boolean,
+        val displayName: String?,
+        val email: String?,
+        val photoUrl: String?
+    )
+
+    private val _account = MutableStateFlow(readAccount())
+    val account: StateFlow<AccountState> = _account.asStateFlow()
+
+    private val _backupState = MutableStateFlow<BackupState>(BackupState.Idle)
+    val backupState: StateFlow<BackupState> = _backupState.asStateFlow()
+
+    sealed class BackupState {
+        object Idle    : BackupState()
+        object Running : BackupState()
+        data class Done(val message: String) : BackupState()
+        data class Err(val message: String)  : BackupState()
+    }
+
+    private fun readAccount(): AccountState {
+        val acct = GoogleSignIn.getLastSignedInAccount(context)
+        return if (acct != null) AccountState(true, acct.displayName, acct.email, acct.photoUrl?.toString())
+        else AccountState(false, null, null, null)
+    }
+
+    /** Called from the Activity after a successful Google Sign-In intent result. */
+    fun onSignInSuccess(account: GoogleSignInAccount) {
+        _account.value = AccountState(true, account.displayName, account.email, account.photoUrl?.toString())
+    }
+
+    fun signOut() {
+        GoogleSignIn.getClient(
+            context,
+            GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN).build()
+        ).signOut().addOnCompleteListener {
+            _account.value = AccountState(false, null, null, null)
+        }
+    }
+
+    /** Manually trigger a Drive backup (also runs automatically at 03:00). */
+    fun triggerBackup() = viewModelScope.launch(Dispatchers.IO) {
+        _backupState.value = BackupState.Running
+        try {
+            val dbFile = context.getDatabasePath("fatum.db")
+            if (!dbFile.exists()) error("Base de datos no encontrada")
+
+            val backupDir = java.io.File(context.cacheDir, "backup").also { it.mkdirs() }
+            val zipFile   = java.io.File(backupDir, "fatum_backup.zip")
+            java.util.zip.ZipOutputStream(zipFile.outputStream().buffered()).use { zip ->
+                zip.putNextEntry(java.util.zip.ZipEntry("fatum.db"))
+                java.io.FileInputStream(dbFile).copyTo(zip)
+                zip.closeEntry()
+            }
+            com.fatum.workers.DriveUploader.uploadBackup(context, zipFile)
+            _backupState.value = BackupState.Done("Backup subido a Google Drive ✓")
+        } catch (e: Exception) {
+            _backupState.value = BackupState.Err(e.message ?: "Error al hacer backup")
+        } finally {
+            delay(4_000)
+            _backupState.value = BackupState.Idle
+        }
     }
 }

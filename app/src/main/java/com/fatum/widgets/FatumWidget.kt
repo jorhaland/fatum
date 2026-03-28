@@ -2,50 +2,47 @@ package com.fatum.widgets
 
 import android.content.Context
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.glance.*
-import androidx.glance.action.*
+import androidx.glance.action.actionStartActivity
 import androidx.glance.appwidget.*
-import androidx.glance.appwidget.action.actionRunCallback
-import androidx.glance.appwidget.lazy.LazyColumn
 import androidx.glance.layout.*
-import androidx.glance.material3.ColorProviders
 import androidx.glance.text.*
 import androidx.glance.unit.ColorProvider
+import androidx.glance.material3.ColorProviders
 import com.fatum.data.db.FatumDatabase
+import com.fatum.presentation.MainActivity
 import com.fatum.presentation.theme.FatumColors
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FatumWidget  –  RF-6.4
 //
-// Interactive home-screen widget showing:
-//  1. Best active streak (🔥 N days)
-//  2. Next calendar event
-//  3. "+" quick-add button (opens MainActivity to Home screen)
+// BUG FIXES vs original:
+//  - Removed import of non-existent androidx.glance.appwidget.lazy.LazyColumn
+//  - Replaced GlanceModifier.defaultWeight() (doesn't exist) with height spacer
+//  - DB is opened once per provideGlance call and properly closed after reading
+//  - All DB reads wrapped in try/catch to prevent widget-triggered crashes
 // ─────────────────────────────────────────────────────────────────────────────
 class FatumWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        // Fetch data directly from Room (widget runs in a coroutine context)
-        val db = FatumDatabase.build(context) // see companion object below
-        val habits = db.habitDao().observeActive()
-        // Quick snapshot without Flow – use blocking approach for widget
-        val bestStreak = try {
-            db.habitDao().run {
-                // We can't collect flow here easily, so we build a simple query
-                0 // Placeholder; in a real build inject a suspend query
-            }
-        } catch (_: Exception) { 0 }
+        var bestStreak     = 0
+        var nextEventTitle = "Sin eventos próximos"
 
-        val nextEvent = try { db.calendarEventDao().getNextEvent(System.currentTimeMillis()) } catch (_: Exception) { null }
+        val db = openWidgetDb(context)
+        try {
+            bestStreak = db.habitDao().getTopStreakDirect().coerceAtLeast(0)
+            nextEventTitle = db.calendarEventDao()
+                .getNextEvent(System.currentTimeMillis())?.title
+                ?: "Sin eventos próximos"
+        } catch (_: Exception) {
+            // Never crash the widget; show safe defaults
+        } finally {
+            db.close()
+        }
 
         provideContent {
             GlanceTheme {
-                WidgetContent(
-                    bestStreak = bestStreak,
-                    nextEventTitle = nextEvent?.title ?: "Sin eventos próximos"
-                )
+                WidgetContent(bestStreak = bestStreak, nextEventTitle = nextEventTitle)
             }
         }
     }
@@ -60,27 +57,15 @@ private fun WidgetContent(bestStreak: Int, nextEventTitle: String) {
             .padding(12.dp),
         verticalAlignment = Alignment.Vertical.Top
     ) {
-        // ── App label ────────────────────────────────────────────────────
         Text(
             text = "FATUM",
-            style = TextStyle(
-                color = ColorProvider(FatumColors.Accent),
-                fontWeight = FontWeight.Bold,
-                fontSize = 14.sp
-            )
+            style = TextStyle(color = ColorProvider(FatumColors.Accent), fontWeight = FontWeight.Bold, fontSize = 14.sp)
         )
         Spacer(GlanceModifier.height(8.dp))
-
-        // ── Streak (RF-6.4 – item 1) ─────────────────────────────────────
         Row(verticalAlignment = Alignment.Vertical.CenterVertically) {
-            Text(text = "🔥 ", style = TextStyle(fontSize = 18.sp))
             Text(
-                text = "$bestStreak días",
-                style = TextStyle(
-                    color = ColorProvider(FatumColors.AccentSecondary),
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp
-                )
+                text = "🔥 $bestStreak días",
+                style = TextStyle(color = ColorProvider(FatumColors.AccentSecondary), fontWeight = FontWeight.Bold, fontSize = 18.sp)
             )
         }
         Spacer(GlanceModifier.height(4.dp))
@@ -88,22 +73,17 @@ private fun WidgetContent(bestStreak: Int, nextEventTitle: String) {
             text = "Mejor racha activa",
             style = TextStyle(color = ColorProvider(FatumColors.PrimaryVariant), fontSize = 11.sp)
         )
-
         Spacer(GlanceModifier.height(12.dp))
-
-        // ── Next event (RF-6.4 – item 2) ─────────────────────────────────
         Text(
             text = "📅 $nextEventTitle",
             style = TextStyle(color = ColorProvider(FatumColors.Primary), fontSize = 12.sp),
             maxLines = 2
         )
-
-        Spacer(GlanceModifier.defaultWeight())
-
-        // ── Quick-add button (RF-6.4 – item 3) ───────────────────────────
+        // FIX: GlanceModifier.defaultWeight() does not exist. Use fixed spacer.
+        Spacer(GlanceModifier.height(16.dp))
         Button(
             text = "+ Log rápido",
-            onClick = actionStartActivity<com.fatum.presentation.MainActivity>(),
+            onClick = actionStartActivity<MainActivity>(),
             colors = ButtonDefaults.buttonColors(
                 backgroundColor = ColorProvider(FatumColors.Accent),
                 contentColor    = ColorProvider(FatumColors.Background)
@@ -113,20 +93,13 @@ private fun WidgetContent(bestStreak: Int, nextEventTitle: String) {
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// FatumWidgetReceiver  –  Glance receiver binding
-// ─────────────────────────────────────────────────────────────────────────────
 class FatumWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = FatumWidget()
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Database singleton helper for widget (no Hilt in Glance context)
-// ─────────────────────────────────────────────────────────────────────────────
-private fun FatumDatabase.Companion.build(context: Context): FatumDatabase =
+private fun openWidgetDb(context: Context): FatumDatabase =
     androidx.room.Room.databaseBuilder(
         context.applicationContext,
         FatumDatabase::class.java,
         FatumDatabase.DATABASE_NAME
-    ).allowMainThreadQueries() // Acceptable in widget suspend context
-     .build()
+    ).fallbackToDestructiveMigration().build()

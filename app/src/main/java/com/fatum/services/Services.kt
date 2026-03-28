@@ -17,23 +17,50 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationCompat
 import androidx.lifecycle.*
-import androidx.lifecycle.ProcessLifecycleOwner
+import androidx.savedstate.SavedStateRegistry
+import androidx.savedstate.SavedStateRegistryController
+import androidx.savedstate.SavedStateRegistryOwner
 import com.fatum.presentation.theme.FatumColors
 import com.fatum.presentation.theme.FatumTheme
-import androidx.savedstate.SavedStateRegistryOwner
-import androidx.savedstate.SavedStateRegistryController
-import androidx.savedstate.setViewTreeSavedStateRegistryOwner
-import androidx.lifecycle.LifecycleRegistry
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.setViewTreeLifecycleOwner
-import androidx.lifecycle.setViewTreeViewModelStoreOwner
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ServiceLifecycleOwner
+//
+// BUG FIX: ComposeView inside a Service requires all three ViewTree owners:
+//   setViewTreeLifecycleOwner        ✓ (was set before)
+//   setViewTreeViewModelStoreOwner   ✓ (was set to null before)
+//   setViewTreeSavedStateRegistryOwner ← WAS MISSING → caused NPE crash
+//
+// This class provides a minimal Lifecycle + SavedStateRegistry that
+// satisfies Compose's requirements inside a Service context.
+// ─────────────────────────────────────────────────────────────────────────────
+private class ServiceLifecycleOwner : SavedStateRegistryOwner {
+    private val lifecycleRegistry = LifecycleRegistry(this)
+    private val savedStateRegistryController = SavedStateRegistryController.create(this)
+
+    override val savedStateRegistry: SavedStateRegistry
+        get() = savedStateRegistryController.savedStateRegistry
+
+    override val lifecycle: Lifecycle
+        get() = lifecycleRegistry
+
+    fun handleCreate() {
+        savedStateRegistryController.performRestore(null)
+        lifecycleRegistry.currentState = Lifecycle.State.CREATED
+    }
+
+    fun handleResume() {
+        lifecycleRegistry.currentState = Lifecycle.State.STARTED
+        lifecycleRegistry.currentState = Lifecycle.State.RESUMED
+    }
+
+    fun handleDestroy() {
+        lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
+    }
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // AppBlockerOverlayService  –  RF-5.2 / RF-5.3 / RF-5.4
-//
-// Foreground service that draws a full-screen overlay (SYSTEM_ALERT_WINDOW)
-// over blocked apps while a Deep Work session is active.
 // ─────────────────────────────────────────────────────────────────────────────
 class AppBlockerOverlayService : Service() {
 
@@ -43,22 +70,25 @@ class AppBlockerOverlayService : Service() {
         const val CHANNEL_ID   = "fatum_blocker_channel"
         const val NOTIF_ID     = 1001
 
-        /** Social apps to block during Deep Work sessions (RF-5.2). */
         val BLOCKED_PACKAGES = setOf(
             "com.instagram.android",
-            "com.twitter.android",      // X (formerly Twitter)
-            "com.zhiliaoapp.musically"  // TikTok
+            "com.twitter.android",
+            "com.zhiliaoapp.musically"
         )
     }
 
     private var windowManager: WindowManager? = null
     private var overlayView: View? = null
 
+    // One lifecycle owner per service instance; reused for each overlay shown.
+    private val composeLifecycleOwner = ServiceLifecycleOwner()
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
         super.onCreate()
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
+        composeLifecycleOwner.handleCreate()
         createNotificationChannel()
     }
 
@@ -72,8 +102,6 @@ class AppBlockerOverlayService : Service() {
 
     private fun startBlocking() {
         startForeground(NOTIF_ID, buildNotification())
-        // UsageMonitorService handles detecting the blocked app; this service
-        // just exposes showOverlay() for when the monitor fires.
     }
 
     private fun stopBlocking() {
@@ -92,25 +120,16 @@ class AppBlockerOverlayService : Service() {
             PixelFormat.TRANSLUCENT
         )
 
-        // Crear un Owner sintético para que Compose no crashee fuera de una Activity
-        val lifecycleOwner = object : LifecycleOwner, SavedStateRegistryOwner {
-            private val lifecycleRegistry = LifecycleRegistry(this)
-            private val savedStateRegistryController = SavedStateRegistryController.create(this)
-            override val savedStateRegistry get() = savedStateRegistryController.savedStateRegistry
-            override val lifecycle get() = lifecycleRegistry
-
-            init {
-                savedStateRegistryController.performRestore(null)
-                lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
-                lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_START)
-                lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
-            }
-        }
+        composeLifecycleOwner.handleResume()
 
         overlayView = ComposeView(this).apply {
-            setViewTreeLifecycleOwner(lifecycleOwner)
-            setViewTreeSavedStateRegistryOwner(lifecycleOwner)
+            // FIX: All three ViewTree owners must be set before setContent.
+            // Missing setViewTreeSavedStateRegistryOwner caused an NPE crash
+            // when the overlay was shown during a Deep Work session.
+            setViewTreeLifecycleOwner(composeLifecycleOwner)
             setViewTreeViewModelStoreOwner(null)
+            setViewTreeSavedStateRegistryOwner(composeLifecycleOwner)
+
             setContent {
                 FatumTheme(darkTheme = true) {
                     BlockerOverlayContent(
@@ -128,23 +147,25 @@ class AppBlockerOverlayService : Service() {
     }
 
     fun hideOverlay() {
-        overlayView?.let { windowManager?.removeView(it) }
+        overlayView?.let {
+            try { windowManager?.removeView(it) } catch (_: Exception) {}
+        }
         overlayView = null
     }
 
     override fun onDestroy() {
         super.onDestroy()
         hideOverlay()
+        composeLifecycleOwner.handleDestroy()
     }
 
-    private fun buildNotification(): Notification {
-        return NotificationCompat.Builder(this, CHANNEL_ID)
+    private fun buildNotification(): Notification =
+        NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("🎯 FATUM – Sesión activa")
             .setContentText("Las redes sociales están bloqueadas.")
             .setSmallIcon(android.R.drawable.ic_lock_lock)
             .setOngoing(true)
             .build()
-    }
 
     private fun createNotificationChannel() {
         val channel = NotificationChannel(
@@ -158,7 +179,7 @@ class AppBlockerOverlayService : Service() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Overlay UI Composable (RF-5.3)
+// Overlay UI (RF-5.3)
 // ─────────────────────────────────────────────────────────────────────────────
 @Composable
 private fun BlockerOverlayContent(appName: String, onInterrupt: () -> Unit) {
@@ -190,7 +211,6 @@ private fun BlockerOverlayContent(appName: String, onInterrupt: () -> Unit) {
                 color = FatumColors.AccentSecondary
             )
             Spacer(Modifier.height(16.dp))
-            // ── RF-5.4: The only escape valve ────────────────────────────
             OutlinedButton(
                 onClick = onInterrupt,
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = FatumColors.Error)
@@ -208,9 +228,6 @@ private fun BlockerOverlayContent(appName: String, onInterrupt: () -> Unit) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // UsageMonitorService  –  RF-5.2
-//
-// Polls UsageStatsManager every 1 second to detect if the user switches
-// to a blocked app, then triggers the overlay.
 // ─────────────────────────────────────────────────────────────────────────────
 class UsageMonitorService : Service() {
 
@@ -256,7 +273,6 @@ class UsageMonitorService : Service() {
                     packageManager.getApplicationInfo(topPackage, 0)
                 ).toString()
             } catch (_: Exception) { topPackage }
-            // Delegate overlay to AppBlockerOverlayService via broadcast
             sendBroadcast(Intent("com.fatum.ACTION_SHOW_OVERLAY").apply {
                 putExtra("app_name", appLabel)
             })

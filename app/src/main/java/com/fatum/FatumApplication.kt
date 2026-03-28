@@ -14,20 +14,17 @@ import javax.inject.Inject
  * Also schedules recurring WorkManager jobs on first launch.
  */
 @HiltAndroidApp
-class FatumApplication : Application() {
+class FatumApplication : Application(), Configuration.Provider {
 
     @Inject lateinit var workerFactory: HiltWorkerFactory
 
-    override fun onCreate() {
-        super.onCreate()
-
-        // 1. Inicialización manual y segura de WorkManager + Hilt
-        val config = Configuration.Builder()
+    override val workManagerConfiguration: Configuration
+        get() = Configuration.Builder()
             .setWorkerFactory(workerFactory)
             .build()
-        WorkManager.initialize(this, config)
 
-        // 2. Programar las tareas de fondo solo cuando ya está inicializado
+    override fun onCreate() {
+        super.onCreate()
         scheduleRecurringWork()
     }
 

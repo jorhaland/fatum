@@ -1,7 +1,6 @@
 package com.fatum.presentation.screens.analytics
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -10,11 +9,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -27,12 +24,12 @@ import com.fatum.presentation.viewmodels.AnalyticsViewModel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AnalyticsScreen(vm: AnalyticsViewModel = hiltViewModel()) {
-    val moods        by vm.allMoods.collectAsStateWithLifecycle()
-    val habits       by vm.activeHabits.collectAsStateWithLifecycle()
-    val goals        by vm.allGoals.collectAsStateWithLifecycle()
-    val sessions     by vm.recentSessions.collectAsStateWithLifecycle()
-    val selectedHabit by vm.correlationHabitId.collectAsStateWithLifecycle()
+    val moods         by vm.allMoods.collectAsStateWithLifecycle()
+    val habits        by vm.activeHabits.collectAsStateWithLifecycle()
+    val goals         by vm.allGoals.collectAsStateWithLifecycle()
+    val sessions      by vm.recentSessions.collectAsStateWithLifecycle()
     val weeklySummary by vm.weeklySummary.collectAsStateWithLifecycle()
+    val selectedHabit by vm.correlationHabitId.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) { vm.generateWeeklySummary() }
 
@@ -40,181 +37,151 @@ fun AnalyticsScreen(vm: AnalyticsViewModel = hiltViewModel()) {
         containerColor = FatumColors.Background,
         topBar = {
             TopAppBar(
-                title = { Text("Análisis") },
+                title = { Text("Análisis", style = MaterialTheme.typography.headlineMedium) },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = FatumColors.Background)
             )
         }
     ) { padding ->
         LazyColumn(
             modifier = Modifier.padding(padding).fillMaxSize(),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // ── Weekly summary (RF-6.3) ─────────────────────────────────
-            weeklySummary?.let { summary ->
+            // ── Weekly summary ──────────────────────────────────────────────
+            weeklySummary?.let { s ->
                 item {
                     SectionHeader("Resumen semanal")
-                    FatumCard(modifier = Modifier.fillMaxWidth()) {
-                        Text(summary.weekRange, style = MaterialTheme.typography.labelSmall, color = FatumColors.PrimaryVariant)
-                        Spacer(Modifier.height(10.dp))
+                    Spacer(Modifier.height(6.dp))
+                    FatumCard(modifier = Modifier.fillMaxWidth(), highlight = true) {
+                        Text(s.weekRange, style = MaterialTheme.typography.labelSmall, color = FatumColors.TextMuted)
+                        Spacer(Modifier.height(14.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceAround
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            StatBlock(label = "Humor medio", value = "%.1f".format(summary.avgMood))
-                            StatBlock(label = "Deep Work", value = "${summary.deepWorkMinutes}m")
-                            StatBlock(label = "Mejor racha", value = "${summary.bestStreak.second}d")
+                            StatTile("humor medio", "%.1f".format(s.avgMood), Modifier.weight(1f))
+                            StatTile("deep work", "${s.deepWorkMinutes}m", Modifier.weight(1f))
+                            StatTile("mejor racha", "${s.bestStreak.second}d", Modifier.weight(1f))
                         }
-                        Spacer(Modifier.height(12.dp))
-                        Text("Avance de metas", style = MaterialTheme.typography.labelSmall, color = FatumColors.PrimaryVariant)
-                        summary.goalProgress.forEach { (title, pct) ->
-                            Spacer(Modifier.height(4.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Text(title, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                                LinearProgressIndicator(
-                                    progress = { pct / 100f },
-                                    modifier = Modifier.weight(1f),
-                                    color = FatumColors.AccentSecondary,
-                                    trackColor = FatumColors.SurfaceVariant
-                                )
-                                Text("${pct.toInt()}%", style = MaterialTheme.typography.labelSmall, color = FatumColors.AccentSecondary)
+                        if (s.goalProgress.isNotEmpty()) {
+                            Spacer(Modifier.height(14.dp))
+                            Text("Progreso de metas", style = MaterialTheme.typography.labelSmall, color = FatumColors.TextMuted)
+                            Spacer(Modifier.height(8.dp))
+                            s.goalProgress.forEach { (title, pct) ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text(title, style = MaterialTheme.typography.bodySmall, color = FatumColors.TextSecondary, modifier = Modifier.weight(1f), maxLines = 1)
+                                    FatumProgressBar(pct / 100f, Modifier.weight(1.5f))
+                                    Text("${pct.toInt()}%", style = MaterialTheme.typography.labelSmall, color = FatumColors.Green, modifier = Modifier.width(32.dp))
+                                }
                             }
                         }
                     }
                 }
             }
 
-            // ── Mood timeline graph ─────────────────────────────────────
-            if (moods.isNotEmpty()) {
+            // ── Mood chart ─────────────────────────────────────────────────
+            if (moods.size >= 3) {
                 item {
-                    SectionHeader("Evolución del humor")
+                    SectionHeader("Humor — últimos 30 días")
+                    Spacer(Modifier.height(6.dp))
                     FatumCard(modifier = Modifier.fillMaxWidth()) {
                         MoodLineChart(moods = moods.takeLast(30))
-                    }
-                }
-            }
-
-            // ── Correlation chart (RF-6.2) ───────────────────────────────
-            item {
-                SectionHeader("Correlación hábito–humor")
-                FatumCard(modifier = Modifier.fillMaxWidth()) {
-                    Text("Selecciona un hábito para ver su correlación con tu humor:", style = MaterialTheme.typography.bodyMedium)
-                    Spacer(Modifier.height(8.dp))
-                    habits.forEach { habit ->
-                        FilterChip(
-                            selected = selectedHabit == habit.id,
-                            onClick = { vm.selectCorrelationHabit(habit.id) },
-                            label = { Text(habit.name) },
-                            modifier = Modifier.padding(end = 6.dp)
-                        )
-                    }
-                    if (selectedHabit != null) {
-                        Spacer(Modifier.height(12.dp))
-                        // Display correlation insight
-                        val habitName = habits.find { it.id == selectedHabit }?.name ?: ""
+                        Spacer(Modifier.height(4.dp))
+                        val avg = moods.takeLast(7).map { it.score }.average()
                         Text(
-                            text = "Mostrando correlación para: $habitName",
+                            "Media 7 días: ${"%.1f".format(avg)} / 10",
                             style = MaterialTheme.typography.labelSmall,
-                            color = FatumColors.Accent
+                            color = FatumColors.TextMuted
                         )
-                        // Visual placeholder for the scatter plot
-                        CorrelationPlaceholder()
                     }
                 }
             }
 
-            // ── Habit streaks leaderboard ───────────────────────────────
+            // ── Habit streaks ───────────────────────────────────────────────
             if (habits.isNotEmpty()) {
-                item { SectionHeader("Rachas activas") }
+                item { SectionHeader("Rachas de hábitos") }
                 items(habits.sortedByDescending { it.currentStreak }) { habit ->
                     HabitStreakRow(habit)
                 }
             }
 
-            // ── Focus session stats ─────────────────────────────────────
+            // ── Focus total ─────────────────────────────────────────────────
             if (sessions.isNotEmpty()) {
                 item {
-                    SectionHeader("Resumen Deep Work")
-                    val completed = sessions.count { it.status == "COMPLETED" }
-                    val failed    = sessions.count { it.status == "FAILED_INTERRUPTED" }
-                    val totalMin  = sessions.filter { it.status == "COMPLETED" }.sumOf { it.durationMinutes }
+                    val total = sessions.filter { it.status == "COMPLETED" }.sumOf { it.durationMinutes }
+                    val rate  = if (sessions.isEmpty()) 0 else (sessions.count { it.status == "COMPLETED" } * 100 / sessions.size)
+                    SectionHeader("Deep Work")
+                    Spacer(Modifier.height(6.dp))
                     FatumCard(modifier = Modifier.fillMaxWidth()) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceAround
-                        ) {
-                            StatBlock(label = "Completadas", value = "$completed")
-                            StatBlock(label = "Interrumpidas", value = "$failed")
-                            StatBlock(label = "Total (min)", value = "$totalMin")
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            StatTile("minutos totales", "$total", Modifier.weight(1f))
+                            StatTile("tasa de éxito", "$rate%", Modifier.weight(1f))
+                            StatTile("sesiones", "${sessions.size}", Modifier.weight(1f))
                         }
                     }
                 }
             }
+
+            if (moods.isEmpty() && habits.isEmpty() && sessions.isEmpty()) {
+                item {
+                    EmptyState(
+                        emoji = "📊",
+                        title = "Sin datos todavía",
+                        subtitle = "Empieza a usar la app y aquí verás tus estadísticas"
+                    )
+                }
+            }
+
+            item { Spacer(Modifier.height(80.dp)) }
         }
     }
 }
 
-// ── Mood line chart (last 30 days) ────────────────────────────────────────
 @Composable
 private fun MoodLineChart(moods: List<DailyMoodEntity>) {
     Canvas(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(120.dp)
+        modifier = Modifier.fillMaxWidth().height(100.dp)
     ) {
         if (moods.size < 2) return@Canvas
-        val w = size.width
-        val h = size.height
+        val w    = size.width
+        val h    = size.height
         val step = w / (moods.size - 1)
-        val path = Path()
 
-        moods.forEachIndexed { i, mood ->
+        // Fill path
+        val fillPath = Path()
+        moods.forEachIndexed { i, m ->
             val x = i * step
-            val y = h - (mood.score / 10f) * h
-            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+            val y = h - (m.score / 10f) * h * 0.9f - h * 0.05f
+            if (i == 0) fillPath.moveTo(x, y) else fillPath.lineTo(x, y)
         }
+        fillPath.lineTo((moods.size - 1) * step, h)
+        fillPath.lineTo(0f, h)
+        fillPath.close()
 
-        drawPath(path = path, color = FatumColors.Accent, style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round))
+        drawPath(fillPath, color = FatumColors.Green.copy(alpha = 0.08f))
 
-        // Draw dots
-        moods.forEachIndexed { i, mood ->
+        // Line path
+        val linePath = Path()
+        moods.forEachIndexed { i, m ->
             val x = i * step
-            val y = h - (mood.score / 10f) * h
-            drawCircle(color = FatumColors.AccentSecondary, radius = 4.dp.toPx(), center = Offset(x, y))
+            val y = h - (m.score / 10f) * h * 0.9f - h * 0.05f
+            if (i == 0) linePath.moveTo(x, y) else linePath.lineTo(x, y)
         }
-    }
-    // X labels
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        moods.firstOrNull()?.let { Text(it.dateString.takeLast(5), style = MaterialTheme.typography.labelSmall, color = FatumColors.PrimaryVariant) }
-        moods.lastOrNull()?.let { Text(it.dateString.takeLast(5), style = MaterialTheme.typography.labelSmall, color = FatumColors.PrimaryVariant) }
+        drawPath(linePath, color = FatumColors.Green, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round))
+
+        // Dots
+        moods.forEachIndexed { i, m ->
+            val x = i * step
+            val y = h - (m.score / 10f) * h * 0.9f - h * 0.05f
+            drawCircle(FatumColors.GreenDim, radius = 3.dp.toPx(), center = Offset(x, y))
+        }
     }
 }
 
-// ── Correlation placeholder (RF-6.2 visual) ───────────────────────────────
-@Composable
-private fun CorrelationPlaceholder() {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(80.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(FatumColors.SurfaceVariant),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            "Los datos de correlación aparecerán aquí conforme registres más días.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = FatumColors.PrimaryVariant,
-            modifier = Modifier.padding(12.dp)
-        )
-    }
-}
-
-// ── Habit streak row ───────────────────────────────────────────────────────
 @Composable
 private fun HabitStreakRow(habit: HabitEntity) {
     FatumCard(modifier = Modifier.fillMaxWidth()) {
@@ -224,19 +191,14 @@ private fun HabitStreakRow(habit: HabitEntity) {
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Column(Modifier.weight(1f)) {
-                Text(habit.name, style = MaterialTheme.typography.titleMedium)
-                Text("Mejor racha: ${habit.maxStreak} días", style = MaterialTheme.typography.labelSmall, color = FatumColors.PrimaryVariant)
+                Text(habit.name, style = MaterialTheme.typography.titleSmall, color = FatumColors.TextPrimary)
+                Text(
+                    "Récord: ${habit.maxStreak} días",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = FatumColors.TextMuted
+                )
             }
             StreakBadge(streak = habit.currentStreak)
         }
-    }
-}
-
-// ── Generic stat block ─────────────────────────────────────────────────────
-@Composable
-private fun StatBlock(label: String, value: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(value, style = MaterialTheme.typography.headlineMedium, color = FatumColors.Accent)
-        Text(label, style = MaterialTheme.typography.labelSmall, color = FatumColors.PrimaryVariant)
     }
 }

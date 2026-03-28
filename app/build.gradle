@@ -1,9 +1,15 @@
+// ══════════════════════════════════════════════════════════════════════════════
+// FATUM — app/build.gradle  (versión corregida)
+// Fixes: [1] plugin GMS añadido  [2] applicationIdSuffix eliminado
+//        [3] bloques packaging fusionados
+// ══════════════════════════════════════════════════════════════════════════════
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
     id 'com.google.devtools.ksp'
     id 'com.google.dagger.hilt.android'
     id 'kotlin-parcelize'
+    id 'com.google.gms.google-services'   // [FIX 1] — procesa google-services.json
 }
 
 android {
@@ -27,7 +33,9 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
         debug {
-            applicationIdSuffix ".debug"
+            // applicationIdSuffix REMOVED: ".debug" changes the package to com.fatum.debug,
+            // which does NOT match com.fatum registered in google-services.json.
+            // Google Play Services would fail to initialize and crash the app on startup.
             debuggable true
         }
     }
@@ -44,10 +52,11 @@ android {
     }
     composeOptions { kotlinCompilerExtensionVersion = "1.5.10" }
 
-    packaging { resources { excludes += '/META-INF/{AL2.0,LGPL2.1}' } }
-
     packaging {
-        resources.excludes.add("META-INF/DEPENDENCIES")
+        resources {
+            excludes += '/META-INF/{AL2.0,LGPL2.1}'
+            excludes += 'META-INF/DEPENDENCIES'
+        }
     }
 }
 
