@@ -29,7 +29,6 @@ fun AnalyticsScreen(vm: AnalyticsViewModel = hiltViewModel()) {
     val goals         by vm.allGoals.collectAsStateWithLifecycle()
     val sessions      by vm.recentSessions.collectAsStateWithLifecycle()
     val weeklySummary by vm.weeklySummary.collectAsStateWithLifecycle()
-    val selectedHabit by vm.correlationHabitId.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) { vm.generateWeeklySummary() }
 

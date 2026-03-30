@@ -12,6 +12,8 @@ import androidx.glance.material3.ColorProviders
 import com.fatum.data.db.FatumDatabase
 import com.fatum.presentation.MainActivity
 import com.fatum.presentation.theme.FatumColors
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FatumWidget  –  RF-6.4
@@ -59,24 +61,24 @@ private fun WidgetContent(bestStreak: Int, nextEventTitle: String) {
     ) {
         Text(
             text = "FATUM",
-            style = TextStyle(color = ColorProvider(FatumColors.Accent), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            style = TextStyle(color = ColorProvider(FatumColors.Green), fontWeight = FontWeight.Bold, fontSize = 14.sp)
         )
         Spacer(GlanceModifier.height(8.dp))
         Row(verticalAlignment = Alignment.Vertical.CenterVertically) {
             Text(
                 text = "🔥 $bestStreak días",
-                style = TextStyle(color = ColorProvider(FatumColors.AccentSecondary), fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                style = TextStyle(color = ColorProvider(FatumColors.Green), fontWeight = FontWeight.Bold, fontSize = 18.sp)
             )
         }
         Spacer(GlanceModifier.height(4.dp))
         Text(
             text = "Mejor racha activa",
-            style = TextStyle(color = ColorProvider(FatumColors.PrimaryVariant), fontSize = 11.sp)
+            style = TextStyle(color = ColorProvider(FatumColors.TextSecondary), fontSize = 11.sp)
         )
         Spacer(GlanceModifier.height(12.dp))
         Text(
             text = "📅 $nextEventTitle",
-            style = TextStyle(color = ColorProvider(FatumColors.Primary), fontSize = 12.sp),
+            style = TextStyle(color = ColorProvider(FatumColors.TextPrimary), fontSize = 12.sp),
             maxLines = 2
         )
         // FIX: GlanceModifier.defaultWeight() does not exist. Use fixed spacer.
@@ -85,7 +87,7 @@ private fun WidgetContent(bestStreak: Int, nextEventTitle: String) {
             text = "+ Log rápido",
             onClick = actionStartActivity<MainActivity>(),
             colors = ButtonDefaults.buttonColors(
-                backgroundColor = ColorProvider(FatumColors.Accent),
+                backgroundColor = ColorProvider(FatumColors.Green),
                 contentColor    = ColorProvider(FatumColors.Background)
             ),
             modifier = GlanceModifier.fillMaxWidth()

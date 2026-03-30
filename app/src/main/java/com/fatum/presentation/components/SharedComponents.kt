@@ -160,6 +160,7 @@ fun HabitToggle(
 // Mood picker — loggd.life style emoji row
 // ─────────────────────────────────────────────────────────────────────────────
 @Composable
+fun MoodPicker(
     current: Int?,
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier

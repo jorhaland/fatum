@@ -25,7 +25,7 @@ import com.fatum.data.db.entities.*
         FocusSessionEntity::class
     ],
     version = 1,
-    exportSchema = true
+    exportSchema = false
 )
 abstract class FatumDatabase : RoomDatabase() {
 

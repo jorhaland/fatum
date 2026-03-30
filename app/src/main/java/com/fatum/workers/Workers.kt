@@ -98,7 +98,7 @@ object DriveUploader {
      */
     suspend fun uploadBackup(context: Context, zipFile: File) = withContext(Dispatchers.IO) {
         // ── Retrieve stored OAuth token via AccountManager ─────────────
-        val account = com.google.android.gms.auth.GoogleAuthUtil.getAccountName(context, null)
+        val account = com.google.android.gms.auth.api.signin.GoogleSignIn.getLastSignedInAccount(context)?.email
             ?: return@withContext  // Not signed in; skip cloud backup
 
         val credential = com.google.api.client.googleapis.extensions.android.gms.auth

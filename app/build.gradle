@@ -9,7 +9,6 @@ plugins {
     id 'com.google.devtools.ksp'
     id 'com.google.dagger.hilt.android'
     id 'kotlin-parcelize'
-    id 'com.google.gms.google-services'   // [FIX 1] — procesa google-services.json
 }
 
 android {
