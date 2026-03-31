@@ -9,6 +9,7 @@ plugins {
     id 'com.google.devtools.ksp'
     id 'com.google.dagger.hilt.android'
     id 'kotlin-parcelize'
+    id 'com.google.gms.google-services'   // [FIX 1] — procesa google-services.json
 }
 
 android {
@@ -61,7 +62,7 @@ android {
 
 // ── Versions ────────────────────────────────────────────────────────────────
 ext {
-    compose_bom     = "2024.10.00"
+    compose_bom     = "2024.02.00"
     room_version    = "2.6.1"
     hilt_version    = "2.50"
     lifecycle_ver   = "2.7.0"
@@ -98,9 +99,9 @@ dependencies {
     implementation "androidx.lifecycle:lifecycle-runtime-compose:${lifecycle_ver}"
 
     // ── Room Database ─────────────────────────────────────────────────────
-    implementation "androidx.room:room-runtime:${room_version}"
-    implementation "androidx.room:room-ktx:${room_version}"
-    ksp "androidx.room:room-compiler:${room_version}"
+    implementation "androidx.room:room-runtime:$room_version"
+    implementation "androidx.room:room-ktx:$room_version"
+    ksp "androidx.room:room-compiler:$room_version"
 
     // ── Hilt DI ───────────────────────────────────────────────────────────
     implementation "com.google.dagger:hilt-android:${hilt_version}"
@@ -122,6 +123,8 @@ dependencies {
     implementation 'com.google.api-client:google-api-client-android:2.2.0'
     implementation 'com.google.oauth-client:google-oauth-client-jetty:1.34.1'
     implementation 'com.google.http-client:google-http-client-gson:1.44.1'
+    implementation(platform("com.google.firebase:firebase-bom:34.11.0"))
+    implementation("com.google.firebase:firebase-analytics")
 
     // ── DataStore (Preferences) ───────────────────────────────────────────
     implementation 'androidx.datastore:datastore-preferences:1.0.0'

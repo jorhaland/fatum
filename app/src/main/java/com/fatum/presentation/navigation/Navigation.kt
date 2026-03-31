@@ -11,20 +11,21 @@ sealed class Screen(
     val iconFilled: ImageVector,
     val iconOutlined: ImageVector
 ) {
-    object Home      : Screen("home",      "Diario",   Icons.Filled.Home,         Icons.Outlined.Home)
-    object Habits    : Screen("habits",    "Hábitos",  Icons.Filled.CheckCircle,  Icons.Outlined.CheckCircle)
-    object Planner   : Screen("planner",   "Agenda",   Icons.Filled.CalendarMonth,Icons.Outlined.CalendarMonth)
-    object Goals     : Screen("goals",     "Metas",    Icons.Filled.Flag,         Icons.Outlined.Flag)
-    object Focus     : Screen("focus",     "Enfoque",  Icons.Filled.Timer,        Icons.Outlined.Timer)
-    object Analytics : Screen("analytics", "Análisis", Icons.Filled.BarChart,     Icons.Outlined.BarChart)
-    object Settings  : Screen("settings",  "Ajustes",  Icons.Filled.Settings,     Icons.Outlined.Settings)
+    object Home    : Screen("home",    "Inicio",  Icons.Filled.Home,         Icons.Outlined.Home)
+    object Habits  : Screen("habits",  "Hábitos", Icons.Filled.CheckCircle,  Icons.Outlined.CheckCircle)
+    object Tasks   : Screen("tasks",   "Tareas",  Icons.Filled.TaskAlt,      Icons.Outlined.TaskAlt)
+    object Goals   : Screen("goals",   "Metas",   Icons.Filled.Flag,         Icons.Outlined.Flag)
+    object Agenda  : Screen("agenda",  "Agenda",  Icons.Filled.CalendarMonth,Icons.Outlined.CalendarMonth)
+    // Not in bottom nav:
+    object Focus   : Screen("focus",   "Enfoque", Icons.Filled.Timer,        Icons.Outlined.Timer)
+    object Profile : Screen("profile", "Perfil",  Icons.Filled.Person,       Icons.Outlined.Person)
 }
 
+/** The 5 bottom-nav destinations. Focus and Profile are accessed via icons. */
 val BottomNavItems = listOf(
     Screen.Home,
     Screen.Habits,
-    Screen.Planner,
+    Screen.Tasks,
     Screen.Goals,
-    Screen.Focus,
-    Screen.Analytics
+    Screen.Agenda
 )

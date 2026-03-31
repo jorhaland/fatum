@@ -1,190 +1,134 @@
 package com.fatum.data.db.entities
 
-import androidx.room.ColumnInfo
-import androidx.room.Entity
-import androidx.room.ForeignKey
-import androidx.room.Index
-import androidx.room.PrimaryKey
+import androidx.room.*
 
 // ─────────────────────────────────────────────────────────────────────────────
-// LogEntity  –  RF-1.1 / RF-1.2 / RF-1.4
-// Represents a single micro-log entry in the diary.
-// ─────────────────────────────────────────────────────────────────────────────
-@Entity(tableName = "logs")
-data class LogEntity(
-    @PrimaryKey(autoGenerate = true) val id: Int = 0,
-    /** Raw text content written by the user. May contain #hashtags. */
-    @ColumnInfo(name = "content") val content: String,
-    /** Unix epoch millis – used for precise ordering in the timeline. */
-    @ColumnInfo(name = "timestamp") val timestamp: Long,
-    /** ISO-8601 date "YYYY-MM-DD" – used for fast date-group queries. */
-    @ColumnInfo(name = "date_string") val dateString: String,
-    /**
-     * Comma-separated hashtag list, e.g. "gym,work,ideas".
-     * Stored as plain text; split in-memory when needed.
-     */
-    @ColumnInfo(name = "tags") val tags: String = ""
-)
-
-// ─────────────────────────────────────────────────────────────────────────────
-// DailyMoodEntity  –  RF-1.3
-// Only one mood entry per day (date_string is the PK).
-// ─────────────────────────────────────────────────────────────────────────────
-@Entity(tableName = "daily_mood")
-data class DailyMoodEntity(
-    /** "YYYY-MM-DD" – acting as PK ensures one row per calendar day. */
-    @PrimaryKey @ColumnInfo(name = "date_string") val dateString: String,
-    /** Mood score 1–10.  Last write wins (UPSERT). */
-    @ColumnInfo(name = "score") val score: Int,
-    /** Epoch millis of the last update for display purposes. */
-    @ColumnInfo(name = "timestamp") val timestamp: Long
-)
-
-// ─────────────────────────────────────────────────────────────────────────────
-// HabitEntity  –  RF-2.1 / RF-2.3
-// Defines a habit's metadata and cached streak values.
+// HabitEntity  –  RF-2.x
+// Two habit types: BOOLEAN (done/not-done) and VALUE (e.g. "read 60 min").
 // ─────────────────────────────────────────────────────────────────────────────
 @Entity(tableName = "habits")
 data class HabitEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
-    @ColumnInfo(name = "name") val name: String,
-    /**
-     * Frequency strategy – one of:
-     * DAILY | WEEKLY_X_TIMES | WEEKLY | MONTHLY_X_TIMES | MONTHLY
-     */
-    @ColumnInfo(name = "frequency_type") val frequencyType: String,
-    /** Target count per cycle (e.g. 3 for "3 times a week"). */
-    @ColumnInfo(name = "frequency_target") val frequencyTarget: Int = 1,
-    /** Visual priority 1–3 stars. */
-    @ColumnInfo(name = "priority_stars") val priorityStars: Int = 1,
-    /** Current active streak – recalculated after each retroactive edit. */
-    @ColumnInfo(name = "current_streak") val currentStreak: Int = 0,
-    /** All-time best streak. */
-    @ColumnInfo(name = "max_streak") val maxStreak: Int = 0,
-    /** Creation timestamp in epoch millis. */
-    @ColumnInfo(name = "created_at") val createdAt: Long,
-    /** Whether the habit is still active (soft-delete). */
-    @ColumnInfo(name = "is_active") val isActive: Boolean = true
+    @ColumnInfo("name")             val name: String,
+    /** BOOLEAN | VALUE */
+    @ColumnInfo("habit_type")       val habitType: String = "BOOLEAN",
+    /** For VALUE habits: the daily target (e.g. 60 minutes). */
+    @ColumnInfo("value_target")     val valueTarget: Int = 0,
+    /** DAILY | WEEKLY_X | WEEKLY | MONTHLY_X | MONTHLY */
+    @ColumnInfo("frequency_type")   val frequencyType: String = "DAILY",
+    @ColumnInfo("frequency_target") val frequencyTarget: Int = 1,
+    @ColumnInfo("current_streak")   val currentStreak: Int = 0,
+    @ColumnInfo("max_streak")       val maxStreak: Int = 0,
+    @ColumnInfo("created_at")       val createdAt: Long,
+    @ColumnInfo("is_active")        val isActive: Boolean = true
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
-// HabitExecutionEntity  –  RF-2.2
-// One row per completion event. Supports retroactive logging.
+// HabitExecutionEntity
+// One row per day per habit. For VALUE habits, value_logged accumulates
+// across multiple entries in a day. We store the aggregate per day.
 // ─────────────────────────────────────────────────────────────────────────────
 @Entity(
     tableName = "habit_executions",
-    foreignKeys = [
-        ForeignKey(
-            entity = HabitEntity::class,
-            parentColumns = ["id"],
-            childColumns = ["habit_id"],
-            onDelete = ForeignKey.CASCADE
-        )
-    ],
-    indices = [
-        Index(value = ["habit_id"]),
-        Index(value = ["habit_id", "date_completed"], unique = true) // one entry per day per habit
-    ]
+    foreignKeys = [ForeignKey(HabitEntity::class, ["id"], ["habit_id"], onDelete = ForeignKey.CASCADE)],
+    indices    = [Index("habit_id"), Index(["habit_id","date_completed"], unique = true)]
 )
 data class HabitExecutionEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
-    @ColumnInfo(name = "habit_id") val habitId: Int,
-    /** The logical date this completion counts for (YYYY-MM-DD). */
-    @ColumnInfo(name = "date_completed") val dateCompleted: String,
-    /** Actual wall-clock time the row was written. */
-    @ColumnInfo(name = "timestamp_logged") val timestampLogged: Long
+    @ColumnInfo("habit_id")         val habitId: Int,
+    /** YYYY-MM-DD */
+    @ColumnInfo("date_completed")   val dateCompleted: String,
+    /** For VALUE habits: accumulated value for this day. For BOOLEAN: always 1. */
+    @ColumnInfo("value_logged")     val valueLogged: Int = 1,
+    @ColumnInfo("timestamp_logged") val timestampLogged: Long
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GoalEntity  –  RF-4.1 / RF-4.2
-// Long-term goal container.
+// TaskEntity  –  Standalone tasks with HIGH/MEDIUM/LOW priority
+// ─────────────────────────────────────────────────────────────────────────────
+@Entity(tableName = "tasks")
+data class TaskEntity(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    @ColumnInfo("title")            val title: String,
+    @ColumnInfo("description")      val description: String? = null,
+    /** HIGH | MEDIUM | LOW */
+    @ColumnInfo("priority")         val priority: String = "MEDIUM",
+    @ColumnInfo("is_completed")     val isCompleted: Boolean = false,
+    @ColumnInfo("due_timestamp")    val dueTimestamp: Long? = null,
+    @ColumnInfo("created_at")       val createdAt: Long
+)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GoalEntity  –  Long-term goals with MILESTONE or VALUE tracking
 // ─────────────────────────────────────────────────────────────────────────────
 @Entity(tableName = "goals")
 data class GoalEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
-    @ColumnInfo(name = "title") val title: String,
-    @ColumnInfo(name = "description") val description: String? = null,
-    @ColumnInfo(name = "priority_stars") val priorityStars: Int = 1,
-    @ColumnInfo(name = "deadline_timestamp") val deadlineTimestamp: Long? = null,
-    /** 0.0–100.0 – updated automatically when child tasks are completed. */
-    @ColumnInfo(name = "progress_percentage") val progressPercentage: Float = 0f,
-    @ColumnInfo(name = "is_completed") val isCompleted: Boolean = false,
-    @ColumnInfo(name = "created_at") val createdAt: Long
+    @ColumnInfo("title")             val title: String,
+    @ColumnInfo("description")       val description: String? = null,
+    /** HIGH | MEDIUM | LOW */
+    @ColumnInfo("priority")          val priority: String = "MEDIUM",
+    @ColumnInfo("deadline_timestamp")val deadlineTimestamp: Long? = null,
+    /** MILESTONE | VALUE */
+    @ColumnInfo("goal_type")         val goalType: String = "MILESTONE",
+    /** For VALUE goals: target to reach (e.g. 10000 €). */
+    @ColumnInfo("target_value")      val targetValue: Float = 0f,
+    /** For VALUE goals: current accumulated value. */
+    @ColumnInfo("current_value")     val currentValue: Float = 0f,
+    @ColumnInfo("is_completed")      val isCompleted: Boolean = false,
+    @ColumnInfo("created_at")        val createdAt: Long
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TaskEntity  –  RF-4.1 / RF-4.3 / RF-4.4
-// Short-term task; optionally linked to a parent Goal.
+// MilestoneEntity  –  Child checkboxes for MILESTONE-type goals
 // ─────────────────────────────────────────────────────────────────────────────
 @Entity(
-    tableName = "tasks",
-    foreignKeys = [
-        ForeignKey(
-            entity = GoalEntity::class,
-            parentColumns = ["id"],
-            childColumns = ["goal_id"],
-            onDelete = ForeignKey.CASCADE
-        )
-    ],
-    indices = [Index(value = ["goal_id"])]
+    tableName   = "milestones",
+    foreignKeys = [ForeignKey(GoalEntity::class, ["id"], ["goal_id"], onDelete = ForeignKey.CASCADE)],
+    indices     = [Index("goal_id")]
 )
-data class TaskEntity(
+data class MilestoneEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
-    /** Null means the task is "orphaned" (plain To-Do). */
-    @ColumnInfo(name = "goal_id") val goalId: Int? = null,
-    @ColumnInfo(name = "title") val title: String,
-    @ColumnInfo(name = "priority_stars") val priorityStars: Int = 1,
-    @ColumnInfo(name = "is_completed") val isCompleted: Boolean = false,
-    @ColumnInfo(name = "due_timestamp") val dueTimestamp: Long? = null,
-    @ColumnInfo(name = "created_at") val createdAt: Long
+    @ColumnInfo("goal_id")           val goalId: Int,
+    @ColumnInfo("title")             val title: String,
+    @ColumnInfo("is_completed")      val isCompleted: Boolean = false,
+    @ColumnInfo("order_index")       val orderIndex: Int = 0
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CalendarEventEntity  –  RF-3.1 / RF-3.2 / RF-3.3 / RF-3.4
-// Local cache of Google Calendar events + native events.
+// CalendarEventEntity  –  RF-3.x  (local cache + GCal imports)
 // ─────────────────────────────────────────────────────────────────────────────
 @Entity(
     tableName = "calendar_events",
-    foreignKeys = [
-        ForeignKey(
-            entity = GoalEntity::class,
-            parentColumns = ["id"],
-            childColumns = ["assigned_goal_id"],
-            onDelete = ForeignKey.SET_NULL
-        )
-    ],
-    indices = [Index(value = ["assigned_goal_id"]), Index(value = ["start_timestamp"])]
+    indices   = [Index("start_timestamp")]
 )
 data class CalendarEventEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
-    /** ID returned by Google Calendar API (null for local-only events). */
-    @ColumnInfo(name = "gcal_event_id") val gcalEventId: String? = null,
-    @ColumnInfo(name = "title") val title: String,
-    @ColumnInfo(name = "start_timestamp") val startTimestamp: Long,
-    @ColumnInfo(name = "end_timestamp") val endTimestamp: Long,
-    /** RFC 5545 RRULE string for recurring events, e.g. "FREQ=WEEKLY;BYDAY=MO,WE". */
-    @ColumnInfo(name = "recurrence_rule") val recurrenceRule: String? = null,
-    @ColumnInfo(name = "priority_stars") val priorityStars: Int = 1,
-    /** Set when this event is a time-block for a specific Goal. */
-    @ColumnInfo(name = "assigned_goal_id") val assignedGoalId: Int? = null,
-    /** Tracks whether the event originates from GCal (true) or is local (false). */
-    @ColumnInfo(name = "is_from_gcal") val isFromGcal: Boolean = false
+    /** Non-null for events imported from GCal. */
+    @ColumnInfo("gcal_event_id")     val gcalEventId: String? = null,
+    @ColumnInfo("title")             val title: String,
+    @ColumnInfo("description")       val description: String? = null,
+    /** HIGH | MEDIUM | LOW */
+    @ColumnInfo("importance")        val importance: String = "MEDIUM",
+    @ColumnInfo("start_timestamp")   val startTimestamp: Long,
+    @ColumnInfo("end_timestamp")     val endTimestamp: Long,
+    /** RFC 5545 RRULE string, e.g. "FREQ=WEEKLY;BYDAY=MO,WE,FR" */
+    @ColumnInfo("recurrence_rule")   val recurrenceRule: String? = null,
+    /** True if originally imported from GCal (edits stay local). */
+    @ColumnInfo("is_from_gcal")      val isFromGcal: Boolean = false,
+    /** True if this event was locally edited after GCal import. */
+    @ColumnInfo("is_locally_modified") val isLocallyModified: Boolean = false
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
-// FocusSessionEntity  –  RF-5.1 / RF-5.4
-// Records each Deep Work timer session and its outcome.
+// FocusSessionEntity  –  Deep Work sessions (timer)
 // ─────────────────────────────────────────────────────────────────────────────
 @Entity(tableName = "focus_sessions")
 data class FocusSessionEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
-    @ColumnInfo(name = "start_timestamp") val startTimestamp: Long,
-    @ColumnInfo(name = "end_timestamp") val endTimestamp: Long,
-    @ColumnInfo(name = "duration_minutes") val durationMinutes: Int,
-    /**
-     * Session outcome:
-     *  - COMPLETED      – timer ran to zero without interruption
-     *  - FAILED_INTERRUPTED – user tapped "Interrupt session"
-     */
-    @ColumnInfo(name = "status") val status: String // "COMPLETED" | "FAILED_INTERRUPTED"
+    @ColumnInfo("start_timestamp")   val startTimestamp: Long,
+    @ColumnInfo("end_timestamp")     val endTimestamp: Long,
+    @ColumnInfo("duration_minutes")  val durationMinutes: Int,
+    /** COMPLETED | FAILED_INTERRUPTED */
+    @ColumnInfo("status")            val status: String
 )

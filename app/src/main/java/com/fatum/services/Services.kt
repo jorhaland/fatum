@@ -22,7 +22,6 @@ import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import com.fatum.presentation.theme.FatumColors
 import com.fatum.presentation.theme.FatumTheme
-import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ServiceLifecycleOwner
@@ -199,17 +198,17 @@ private fun BlockerOverlayContent(appName: String, onInterrupt: () -> Unit) {
             Text(
                 text = "Sesión en curso",
                 style = MaterialTheme.typography.headlineMedium,
-                color = FatumColors.TextPrimary
+                color = FatumColors.Primary
             )
             Text(
                 text = "$appName está bloqueado mientras tu sesión de Deep Work está activa.",
                 style = MaterialTheme.typography.bodyLarge,
-                color = FatumColors.TextSecondary
+                color = FatumColors.PrimaryVariant
             )
             Text(
                 text = "Vuelve a FATUM y sigue concentrado. Tú puedes.",
                 style = MaterialTheme.typography.bodyMedium,
-                color = FatumColors.Green
+                color = FatumColors.AccentSecondary
             )
             Spacer(Modifier.height(16.dp))
             OutlinedButton(

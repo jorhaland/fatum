@@ -11,26 +11,20 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
-/**
- * Hilt module that provides database and DAO singletons.
- * Repositories are @Singleton and inject their own DAOs via constructor.
- */
 @Module
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {
 
-    @Provides
-    @Singleton
-    fun provideDatabase(@ApplicationContext context: Context): FatumDatabase =
-        Room.databaseBuilder(context, FatumDatabase::class.java, FatumDatabase.DATABASE_NAME)
-            .fallbackToDestructiveMigration() // Replace with proper Migration in production
+    @Provides @Singleton
+    fun provideDatabase(@ApplicationContext ctx: Context): FatumDatabase =
+        Room.databaseBuilder(ctx, FatumDatabase::class.java, FatumDatabase.DATABASE_NAME)
+            .fallbackToDestructiveMigration()   // dev build: wipe on schema change
             .build()
 
-    @Provides fun provideLogDao(db: FatumDatabase): LogDao = db.logDao()
-    @Provides fun provideMoodDao(db: FatumDatabase): MoodDao = db.moodDao()
-    @Provides fun provideHabitDao(db: FatumDatabase): HabitDao = db.habitDao()
-    @Provides fun provideGoalDao(db: FatumDatabase): GoalDao = db.goalDao()
-    @Provides fun provideTaskDao(db: FatumDatabase): TaskDao = db.taskDao()
+    @Provides fun provideHabitDao(db: FatumDatabase): HabitDao             = db.habitDao()
+    @Provides fun provideTaskDao(db: FatumDatabase): TaskDao               = db.taskDao()
+    @Provides fun provideGoalDao(db: FatumDatabase): GoalDao               = db.goalDao()
+    @Provides fun provideMilestoneDao(db: FatumDatabase): MilestoneDao     = db.milestoneDao()
     @Provides fun provideCalendarEventDao(db: FatumDatabase): CalendarEventDao = db.calendarEventDao()
-    @Provides fun provideFocusSessionDao(db: FatumDatabase): FocusSessionDao = db.focusSessionDao()
+    @Provides fun provideFocusSessionDao(db: FatumDatabase): FocusSessionDao  = db.focusSessionDao()
 }

@@ -2,20 +2,15 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- ── Permissions ──────────────────────────────────────────────────── -->
-    <!-- Internet for Google APIs -->
+    <!-- Internet & network -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
-    <!-- Usage Stats for Deep Work app blocking -->
-    <uses-permission
-        android:name="android.permission.PACKAGE_USAGE_STATS"
-        tools:ignore="ProtectedPermissions" />
-
-    <!-- Overlay window for app blocker screen -->
+    <!-- Deep Work: usage stats + overlay -->
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
-    <!-- Foreground service for deep work session -->
+    <!-- Foreground services -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
@@ -24,11 +19,11 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
 
-    <!-- Wake lock for WorkManager backup at 03:00 -->
+    <!-- WorkManager wake lock + reboot -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
-    <!-- Account access for Google Sign-In -->
+    <!-- Google account -->
     <uses-permission android:name="android.permission.GET_ACCOUNTS" />
 
     <application
@@ -41,9 +36,9 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.Fatum"
-        tools:targetApi="31">
+        tools:targetApi="34">
 
-        <!-- ── Main Activity ────────────────────────────────────────────── -->
+        <!-- Main activity -->
         <activity
             android:name=".presentation.MainActivity"
             android:exported="true"
@@ -56,7 +51,7 @@
             </intent-filter>
         </activity>
 
-        <!-- ── App Blocker Overlay Service ──────────────────────────────── -->
+        <!-- App Blocker Overlay Service -->
         <service
             android:name=".services.AppBlockerOverlayService"
             android:exported="false"
@@ -66,7 +61,7 @@
                 android:value="app_blocker_overlay" />
         </service>
 
-        <!-- ── Usage Stats Monitor Service ──────────────────────────────── -->
+        <!-- Usage Monitor Service -->
         <service
             android:name=".services.UsageMonitorService"
             android:exported="false"
@@ -76,16 +71,14 @@
                 android:value="usage_monitor" />
         </service>
 
-        <!-- ── Boot Receiver (reschedule WorkManager on reboot) ─────────── -->
-        <receiver
-            android:name=".workers.BootReceiver"
-            android:exported="true">
+        <!-- Boot receiver -->
+        <receiver android:name=".workers.BootReceiver" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
 
-        <!-- ── Glance App Widget ─────────────────────────────────────────── -->
+        <!-- Widget -->
         <receiver
             android:name=".widgets.FatumWidgetReceiver"
             android:exported="true"
@@ -98,25 +91,12 @@
                 android:resource="@xml/fatum_widget_info" />
         </receiver>
 
-        <!-- ── Google OAuth provider ────────────────────────────────────── -->
+        <!-- Google Play Services -->
         <meta-data
             android:name="com.google.android.gms.version"
             android:value="@integer/google_play_services_version" />
 
-        <!--
-            ══ FIX BUG 1: WorkManager startup crash ══════════════════════════
-            FatumApplication implements Configuration.Provider to supply a
-            custom HiltWorkerFactory. The androidx.startup library (bundled
-            with WorkManager) runs WorkManagerInitializer inside a
-            ContentProvider.onCreate(), which fires BEFORE Application.onCreate()
-            and therefore BEFORE Hilt injects workerFactory.
-            Accessing the lateinit workerFactory at that point throws
-            UninitializedPropertyAccessException and crashes the app.
-
-            Fix: disable the automatic startup initializer so WorkManager
-            initializes lazily (via Configuration.Provider) only after Hilt
-            has completed its injection in Application.onCreate().
-        -->
+        <!-- Disable auto WorkManager initializer (Hilt provides custom factory) -->
         <provider
             android:name="androidx.startup.InitializationProvider"
             android:authorities="${applicationId}.androidx-startup"

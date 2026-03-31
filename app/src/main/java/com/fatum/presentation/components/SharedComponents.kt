@@ -12,287 +12,187 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.*
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.draw.*
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.*
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.*
 import com.fatum.presentation.theme.FatumColors
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Surface card — the building block of all screens
-// ─────────────────────────────────────────────────────────────────────────────
+// ── FatumCard ─────────────────────────────────────────────────────────────────
 @Composable
-fun FatumCard(
-    modifier: Modifier = Modifier,
-    onClick: (() -> Unit)? = null,
-    highlight: Boolean = false,
-    content: @Composable ColumnScope.() -> Unit
-) {
-    val bgColor = if (highlight) FatumColors.GreenSurface else FatumColors.Surface
-    val borderColor = if (highlight) FatumColors.GreenBorder else FatumColors.Border
-    val m = if (onClick != null) modifier.clickable(onClick = onClick) else modifier
+fun FatumCard(modifier: Modifier = Modifier, onClick: (() -> Unit)? = null,
+              highlight: Boolean = false, content: @Composable ColumnScope.() -> Unit) {
+    val bg  = if (highlight) FatumColors.GreenSurface else FatumColors.Surface
+    val bdr = if (highlight) FatumColors.GreenBorder  else FatumColors.Border
     Surface(
-        modifier = m,
-        shape = RoundedCornerShape(16.dp),
-        color = bgColor,
-        border = BorderStroke(1.dp, borderColor)
-    ) {
-        Column(modifier = Modifier.padding(16.dp), content = content)
-    }
+        modifier = if (onClick != null) modifier.clickable(onClick = onClick) else modifier,
+        shape  = RoundedCornerShape(16.dp), color = bg,
+        border = BorderStroke(1.dp, bdr)
+    ) { Column(Modifier.padding(16.dp), content = content) }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Green primary button — loggd.life style
-// ─────────────────────────────────────────────────────────────────────────────
+// ── FatumButton ───────────────────────────────────────────────────────────────
 @Composable
-fun FatumButton(
-    text: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true,
-    icon: (@Composable () -> Unit)? = null
-) {
+fun FatumButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier,
+                enabled: Boolean = true, icon: (@Composable () -> Unit)? = null) {
     Button(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = modifier.height(48.dp),
-        shape = RoundedCornerShape(12.dp),
+        onClick = onClick, enabled = enabled,
+        modifier = modifier.height(48.dp), shape = RoundedCornerShape(12.dp),
         colors = ButtonDefaults.buttonColors(
-            containerColor = FatumColors.Green,
-            contentColor   = Color(0xFF0F1117),
-            disabledContainerColor = FatumColors.SurfaceVariant,
-            disabledContentColor   = FatumColors.TextMuted
+            containerColor = FatumColors.Green, contentColor = Color(0xFF0F1117),
+            disabledContainerColor = FatumColors.SurfaceVariant, disabledContentColor = FatumColors.TextMuted
         )
     ) {
         if (icon != null) { icon(); Spacer(Modifier.width(6.dp)) }
-        Text(text, style = MaterialTheme.typography.titleSmall, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+        Text(text, style = MaterialTheme.typography.titleSmall,
+             fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Section label — uppercase small text like loggd.life section headers
-// ─────────────────────────────────────────────────────────────────────────────
+// ── SectionHeader ─────────────────────────────────────────────────────────────
 @Composable
-fun SectionHeader(
-    title: String,
-    action: (@Composable () -> Unit)? = null,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 4.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = title.uppercase(),
-            style = MaterialTheme.typography.labelSmall,
-            color = FatumColors.TextMuted,
-            letterSpacing = 1.sp
-        )
+fun SectionHeader(title: String, action: (@Composable () -> Unit)? = null, modifier: Modifier = Modifier) {
+    Row(modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        Text(title.uppercase(), style = MaterialTheme.typography.labelSmall,
+             color = FatumColors.TextMuted, letterSpacing = 1.sp)
         action?.invoke()
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Streak badge — fire + count, loggd.life style
-// ─────────────────────────────────────────────────────────────────────────────
+// ── StreakBadge ───────────────────────────────────────────────────────────────
 @Composable
 fun StreakBadge(streak: Int, modifier: Modifier = Modifier) {
     if (streak <= 0) return
-    Row(
-        modifier = modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(Color(0xFF2A1F12))
-            .border(1.dp, Color(0xFF4A2E12), RoundedCornerShape(20.dp))
-            .padding(horizontal = 10.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(3.dp)
-    ) {
-        Text("🔥", style = MaterialTheme.typography.bodySmall)
-        Text(
-            text = "$streak",
-            style = MaterialTheme.typography.titleSmall,
-            color = FatumColors.Warning
-        )
+    Row(modifier.clip(RoundedCornerShape(20.dp)).background(Color(0xFF2A1F12))
+        .border(1.dp, Color(0xFF4A2E12), RoundedCornerShape(20.dp))
+        .padding(horizontal = 8.dp, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+        Text("🔥", style = MaterialTheme.typography.labelSmall)
+        Text("$streak", style = MaterialTheme.typography.titleSmall, color = FatumColors.Warning)
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Circular habit toggle — green check on completion, loggd.life style
-// ─────────────────────────────────────────────────────────────────────────────
+// ── HabitToggle ───────────────────────────────────────────────────────────────
 @Composable
-fun HabitToggle(
-    done: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val animScale by animateFloatAsState(
-        targetValue = if (done) 1f else 0.85f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
-        label = "toggle_scale"
-    )
-    Box(
-        modifier = modifier
-            .size(40.dp)
-            .graphicsLayer { scaleX = animScale; scaleY = animScale }
-            .clip(CircleShape)
-            .background(if (done) FatumColors.Green else FatumColors.SurfaceVariant)
-            .border(2.dp, if (done) FatumColors.GreenDim else FatumColors.Border, CircleShape)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center
-    ) {
-        AnimatedVisibility(visible = done, enter = scaleIn() + fadeIn(), exit = scaleOut() + fadeOut()) {
-            Icon(
-                Icons.Default.Check,
-                contentDescription = null,
-                tint = Color(0xFF0F1117),
-                modifier = Modifier.size(20.dp)
-            )
+fun HabitToggle(done: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val scale by animateFloatAsState(if (done) 1f else 0.88f,
+        spring(Spring.DampingRatioMediumBouncy), label = "scale")
+    Box(modifier.size(40.dp).graphicsLayer { scaleX = scale; scaleY = scale }
+        .clip(CircleShape)
+        .background(if (done) FatumColors.Green else FatumColors.SurfaceVariant)
+        .border(2.dp, if (done) FatumColors.GreenDim else FatumColors.Border, CircleShape)
+        .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center) {
+        AnimatedVisibility(done, enter = scaleIn() + fadeIn(), exit = scaleOut() + fadeOut()) {
+            Icon(Icons.Default.Check, null, tint = Color(0xFF0F1117), modifier = Modifier.size(20.dp))
         }
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Mood picker — loggd.life style emoji row
-// ─────────────────────────────────────────────────────────────────────────────
+// ── Priority pill button: HIGH / MEDIUM / LOW ─────────────────────────────────
 @Composable
-fun MoodPicker(
-    current: Int?,
-    onSelect: (Int) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val moods = listOf("😞","😟","😕","😐","🙂","😊","😄","😁","🤩","🥳")
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceEvenly
-    ) {
-        moods.forEachIndexed { idx, emoji ->
-            val n = idx + 1
-            val selected = n == current
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(if (selected) FatumColors.GreenSurface else Color.Transparent)
-                    .border(
-                        width = if (selected) 1.dp else 0.dp,
-                        color = if (selected) FatumColors.GreenBorder else Color.Transparent,
-                        shape = RoundedCornerShape(10.dp)
-                    )
-                    .clickable { onSelect(n) }
-                    .padding(horizontal = 4.dp, vertical = 6.dp)
-            ) {
-                Text(emoji, style = MaterialTheme.typography.bodyMedium)
-                Text(
-                    text = "$n",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = if (selected) FatumColors.Green else FatumColors.TextMuted
-                )
+fun PriorityButton(priority: String, onSelect: (String) -> Unit, modifier: Modifier = Modifier) {
+    Row(modifier, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        listOf("HIGH","MEDIUM","LOW").forEach { p ->
+            val sel = p == priority
+            val (bg, txt) = when (p) {
+                "HIGH"   -> FatumColors.Error.copy(.15f) to FatumColors.Error
+                "MEDIUM" -> FatumColors.Warning.copy(.15f) to FatumColors.Warning
+                else     -> FatumColors.SurfaceVariant to FatumColors.TextMuted
+            }
+            val label = when(p) { "HIGH" -> "Alta"; "MEDIUM" -> "Media"; else -> "Baja" }
+            Box(Modifier.clip(RoundedCornerShape(20.dp))
+                .background(if (sel) bg else FatumColors.SurfaceVariant)
+                .border(1.dp, if (sel) txt else FatumColors.Border, RoundedCornerShape(20.dp))
+                .clickable { onSelect(p) }
+                .padding(horizontal = 12.dp, vertical = 6.dp)) {
+                Text(label, style = MaterialTheme.typography.labelLarge,
+                     color = if (sel) txt else FatumColors.TextMuted)
             }
         }
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Priority stars
-// ─────────────────────────────────────────────────────────────────────────────
+// ── Priority colored dot ──────────────────────────────────────────────────────
 @Composable
-fun PriorityStars(
-    value: Int,
-    onValueChange: ((Int) -> Unit)? = null,
-    modifier: Modifier = Modifier
-) {
-    Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-        (1..3).forEach { n ->
-            val filled = n <= value
-            val color = when { n > value -> FatumColors.Border; value == 1 -> FatumColors.Star1; value == 2 -> FatumColors.Star2; else -> FatumColors.Star3 }
-            Icon(
-                if (filled) Icons.Filled.Star else Icons.Outlined.StarOutline,
-                contentDescription = null,
-                tint = color,
-                modifier = Modifier
-                    .size(16.dp)
-                    .then(if (onValueChange != null) Modifier.clickable { onValueChange(n) } else Modifier)
-            )
-        }
+fun PriorityDot(priority: String, modifier: Modifier = Modifier) {
+    val color = when (priority) { "HIGH" -> FatumColors.Error; "MEDIUM" -> FatumColors.Warning; else -> FatumColors.TextMuted }
+    Box(modifier.size(8.dp).clip(CircleShape).background(color))
+}
+
+// ── FatumChip ─────────────────────────────────────────────────────────────────
+@Composable
+fun FatumChip(label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Box(modifier.clip(RoundedCornerShape(20.dp))
+        .background(if (selected) FatumColors.GreenSurface else FatumColors.SurfaceVariant)
+        .border(1.dp, if (selected) FatumColors.GreenBorder else FatumColors.Border, RoundedCornerShape(20.dp))
+        .clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 6.dp)) {
+        Text(label, style = MaterialTheme.typography.labelLarge,
+             color = if (selected) FatumColors.Green else FatumColors.TextSecondary)
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// GitHub/loggd.life-style year heat-map
-// ─────────────────────────────────────────────────────────────────────────────
+// ── FatumProgressBar ──────────────────────────────────────────────────────────
 @Composable
-fun HeatMapGrid(
-    data: Map<String, Int>,
-    onDayClick: (String) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val today     = LocalDate.now()
-    val monday    = today.minusDays(today.dayOfWeek.value.toLong() - 1)
-    val startDay  = monday.minusWeeks(51)
-    val allDates  = (0 until 364).map { startDay.plusDays(it.toLong()) }
-    val maxCount  = (data.values.maxOrNull() ?: 1).toFloat().coerceAtLeast(1f)
-    val fmt       = DateTimeFormatter.ofPattern("yyyy-MM-dd")
+fun FatumProgressBar(progress: Float, modifier: Modifier = Modifier) {
+    Box(modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)).background(FatumColors.SurfaceVariant)) {
+        Box(Modifier.fillMaxHeight().fillMaxWidth(progress.coerceIn(0f,1f))
+            .clip(RoundedCornerShape(3.dp))
+            .background(Brush.horizontalGradient(listOf(FatumColors.GreenDim, FatumColors.Green))))
+    }
+}
 
-    Column(modifier = modifier) {
-        // Month labels row
-        Row(modifier = Modifier.padding(start = 20.dp)) {
-            val monthsSeen = mutableSetOf<Int>()
-            allDates.filterIndexed { i, _ -> i % 7 == 0 }.forEach { weekStart ->
-                val m = weekStart.monthValue
-                if (monthsSeen.add(m)) {
-                    Text(
-                        text = weekStart.month.name.take(3).lowercase().replaceFirstChar { it.uppercase() },
-                        style = MaterialTheme.typography.labelSmall,
-                        color = FatumColors.TextMuted,
-                        modifier = Modifier.width(26.dp)
-                    )
-                } else {
-                    Spacer(Modifier.width(26.dp))
-                }
-            }
-        }
-        Spacer(Modifier.height(4.dp))
-        Row {
-            // Day labels
-            Column(modifier = Modifier.padding(top = 4.dp)) {
-                listOf("M","W","F").forEachIndexed { idx, label ->
-                    val topPad = if (idx == 0) 0.dp else 10.dp
-                    Text(label, style = MaterialTheme.typography.labelSmall, color = FatumColors.TextMuted,
-                        modifier = Modifier.padding(top = topPad, end = 4.dp).height(12.dp))
-                    if (idx < 2) Spacer(Modifier.height(2.dp))
-                }
-            }
-            // 52-week grid
-            Box(modifier = Modifier.horizontalScroll(rememberScrollState())) {
-                Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                    (0 until 52).forEach { week ->
-                        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                            (0 until 7).forEach { dayOfWeek ->
-                                val date = startDay.plusDays((week * 7 + dayOfWeek).toLong())
-                                val key   = date.format(fmt)
-                                val count = data[key] ?: 0
-                                val inten = count / maxCount
-                                val color = when {
-                                    count == 0   -> FatumColors.Heat0
-                                    inten < 0.25 -> FatumColors.Heat1
-                                    inten < 0.50 -> FatumColors.Heat2
-                                    inten < 0.75 -> FatumColors.Heat3
-                                    else         -> FatumColors.Heat4
-                                }
-                                Box(
-                                    modifier = Modifier
-                                        .size(11.dp)
-                                        .clip(RoundedCornerShape(2.dp))
-                                        .background(color)
-                                        .clickable { onDayClick(key) }
-                                )
-                            }
+// ── StatTile ──────────────────────────────────────────────────────────────────
+@Composable
+fun StatTile(label: String, value: String, modifier: Modifier = Modifier) {
+    Column(modifier.clip(RoundedCornerShape(12.dp)).background(FatumColors.SurfaceVariant)
+        .padding(horizontal = 16.dp, vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(value, style = MaterialTheme.typography.headlineSmall, color = FatumColors.Green)
+        Spacer(Modifier.height(2.dp))
+        Text(label, style = MaterialTheme.typography.labelSmall, color = FatumColors.TextMuted)
+    }
+}
+
+// ── EmptyState ────────────────────────────────────────────────────────────────
+@Composable
+fun EmptyState(emoji: String, title: String, subtitle: String, modifier: Modifier = Modifier) {
+    Column(modifier.fillMaxWidth().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally,
+           verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(emoji, style = MaterialTheme.typography.displayMedium)
+        Text(title, style = MaterialTheme.typography.titleLarge, color = FatumColors.TextPrimary)
+        Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = FatumColors.TextMuted, textAlign = TextAlign.Center)
+    }
+}
+
+// ── GitHub-style heatmap for a single habit ───────────────────────────────────
+@Composable
+fun HabitHeatmap(data: Map<String, Int>, maxVal: Int, modifier: Modifier = Modifier) {
+    val today    = LocalDate.now()
+    val monday   = today.minusDays(today.dayOfWeek.value.toLong() - 1)
+    val startDay = monday.minusWeeks(16)  // 17 weeks ≈ 4 months for per-habit view
+    val fmt      = DateTimeFormatter.ofPattern("yyyy-MM-dd")
+    val maxF     = maxOf(maxVal, 1).toFloat()
+
+    Box(modifier.horizontalScroll(rememberScrollState())) {
+        Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+            (0 until 17).forEach { week ->
+                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    (0 until 7).forEach { dow ->
+                        val date  = startDay.plusDays((week * 7 + dow).toLong())
+                        val key   = date.format(fmt)
+                        val count = data[key] ?: 0
+                        val inten = count / maxF
+                        val color = when {
+                            count == 0   -> FatumColors.Heat0
+                            inten < 0.25 -> FatumColors.Heat1
+                            inten < 0.50 -> FatumColors.Heat2
+                            inten < 0.75 -> FatumColors.Heat3
+                            else         -> FatumColors.Heat4
                         }
+                        Box(Modifier.size(11.dp).clip(RoundedCornerShape(2.dp)).background(color))
                     }
                 }
             }
@@ -300,93 +200,40 @@ fun HeatMapGrid(
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Progress bar with label
-// ─────────────────────────────────────────────────────────────────────────────
+// ── Full-year heatmap ─────────────────────────────────────────────────────────
 @Composable
-fun FatumProgressBar(progress: Float, modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(6.dp)
-            .clip(RoundedCornerShape(3.dp))
-            .background(FatumColors.SurfaceVariant)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxHeight()
-                .fillMaxWidth(progress.coerceIn(0f, 1f))
-                .clip(RoundedCornerShape(3.dp))
-                .background(
-                    Brush.horizontalGradient(listOf(FatumColors.GreenDim, FatumColors.Green))
-                )
-        )
+fun HeatMapGrid(data: Map<String, Int>, onDayClick: (String) -> Unit, modifier: Modifier = Modifier) {
+    val today    = LocalDate.now()
+    val monday   = today.minusDays(today.dayOfWeek.value.toLong() - 1)
+    val startDay = monday.minusWeeks(51)
+    val fmt      = DateTimeFormatter.ofPattern("yyyy-MM-dd")
+    val maxCount = (data.values.maxOrNull() ?: 1).toFloat().coerceAtLeast(1f)
+
+    Box(modifier.horizontalScroll(rememberScrollState())) {
+        Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+            (0 until 52).forEach { week ->
+                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    (0 until 7).forEach { dow ->
+                        val date  = startDay.plusDays((week * 7 + dow).toLong())
+                        val key   = date.format(fmt)
+                        val count = data[key] ?: 0
+                        val inten = count / maxCount
+                        val color = when {
+                            count == 0   -> FatumColors.Heat0
+                            inten < 0.25 -> FatumColors.Heat1
+                            inten < 0.50 -> FatumColors.Heat2
+                            inten < 0.75 -> FatumColors.Heat3
+                            else         -> FatumColors.Heat4
+                        }
+                        Box(Modifier.size(11.dp).clip(RoundedCornerShape(2.dp)).background(color).clickable { onDayClick(key) })
+                    }
+                }
+            }
+        }
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Chip — used for tag filters, frequency selectors
-// ─────────────────────────────────────────────────────────────────────────────
-@Composable
-fun FatumChip(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val bg     = if (selected) FatumColors.GreenSurface else FatumColors.SurfaceVariant
-    val border = if (selected) FatumColors.GreenBorder   else FatumColors.Border
-    val text   = if (selected) FatumColors.Green          else FatumColors.TextSecondary
-
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(bg)
-            .border(1.dp, border, RoundedCornerShape(20.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 6.dp)
-    ) {
-        Text(label, style = MaterialTheme.typography.labelLarge, color = text)
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Stat tile — compact number + label used in summaries
-// ─────────────────────────────────────────────────────────────────────────────
-@Composable
-fun StatTile(label: String, value: String, modifier: Modifier = Modifier) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(FatumColors.SurfaceVariant)
-            .padding(horizontal = 16.dp, vertical = 12.dp)
-    ) {
-        Text(value, style = MaterialTheme.typography.headlineSmall, color = FatumColors.Green)
-        Spacer(Modifier.height(2.dp))
-        Text(label, style = MaterialTheme.typography.labelSmall, color = FatumColors.TextMuted)
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Empty state placeholder
-// ─────────────────────────────────────────────────────────────────────────────
-@Composable
-fun EmptyState(emoji: String, title: String, subtitle: String, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier.fillMaxWidth().padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Text(emoji, style = MaterialTheme.typography.displayMedium)
-        Text(title, style = MaterialTheme.typography.titleLarge, color = FatumColors.TextPrimary)
-        Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = FatumColors.TextMuted, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Shared TextField color helpers — import these instead of per-screen duplicates
-// ─────────────────────────────────────────────────────────────────────────────
+// ── OutlinedTextField colors ───────────────────────────────────────────────────
 @Composable
 fun fatumOutlinedFieldColors() = OutlinedTextFieldDefaults.colors(
     focusedBorderColor      = FatumColors.Green,
@@ -396,6 +243,16 @@ fun fatumOutlinedFieldColors() = OutlinedTextFieldDefaults.colors(
     cursorColor             = FatumColors.Green,
     focusedLabelColor       = FatumColors.Green,
     unfocusedLabelColor     = FatumColors.TextMuted,
-    focusedContainerColor   = androidx.compose.ui.graphics.Color.Transparent,
-    unfocusedContainerColor = androidx.compose.ui.graphics.Color.Transparent
+    focusedContainerColor   = Color.Transparent,
+    unfocusedContainerColor = Color.Transparent
 )
+
+// ── Importance color helper ────────────────────────────────────────────────────
+fun importanceColor(importance: String) = when (importance) {
+    "HIGH"   -> FatumColors.Error
+    "MEDIUM" -> FatumColors.Warning
+    else     -> FatumColors.TextMuted
+}
+
+// ── Priority label helper ──────────────────────────────────────────────────────
+fun priorityLabel(p: String) = when(p) { "HIGH" -> "Alta"; "MEDIUM" -> "Media"; else -> "Baja" }

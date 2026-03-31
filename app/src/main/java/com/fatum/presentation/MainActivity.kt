@@ -9,26 +9,20 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.*
 import com.fatum.presentation.navigation.*
-import com.fatum.presentation.screens.analytics.AnalyticsScreen
 import com.fatum.presentation.screens.focus.FocusScreen
 import com.fatum.presentation.screens.goals.GoalsScreen
 import com.fatum.presentation.screens.habits.HabitsScreen
-import com.fatum.presentation.screens.home.HomeScreen
+import com.fatum.presentation.screens.home.DashboardScreen
 import com.fatum.presentation.screens.planner.PlannerScreen
-import com.fatum.presentation.screens.settings.SettingsScreen
+import com.fatum.presentation.screens.profile.ProfileScreen
+import com.fatum.presentation.screens.tasks.TasksScreen
 import com.fatum.presentation.theme.FatumColors
 import com.fatum.presentation.theme.FatumTheme
 import dagger.hilt.android.AndroidEntryPoint
 
-/**
- * Single-activity host.
- * Settings is accessible via the gear icon in the top app bar of the Home screen
- * so it doesn't consume a precious bottom-nav slot.
- */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -40,38 +34,30 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun FatumApp() {
-    val navController = rememberNavController()
-    val backStack     by navController.currentBackStackEntryAsState()
-    val currentRoute  = backStack?.destination?.route
+    val nav          = rememberNavController()
+    val backStack    by nav.currentBackStackEntryAsState()
+    val currentRoute = backStack?.destination?.route
+
+    // Routes that hide the bottom bar
+    val noBottomBar = setOf(Screen.Focus.route, Screen.Profile.route)
 
     Scaffold(
         containerColor = FatumColors.Background,
         bottomBar = {
-            // Hide bottom nav on Settings screen
-            if (currentRoute != Screen.Settings.route) {
-                NavigationBar(
-                    containerColor = FatumColors.Surface,
-                    tonalElevation = 0.dp
-                ) {
+            if (currentRoute !in noBottomBar) {
+                NavigationBar(containerColor = FatumColors.Surface, tonalElevation = 0.dp) {
                     BottomNavItems.forEach { screen ->
                         val selected = currentRoute == screen.route
                         NavigationBarItem(
                             selected = selected,
-                            onClick = {
-                                navController.navigate(screen.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) {
-                                        saveState = true
-                                    }
+                            onClick  = {
+                                nav.navigate(screen.route) {
+                                    popUpTo(nav.graph.findStartDestination().id) { saveState = true }
                                     launchSingleTop = true
                                     restoreState    = true
                                 }
                             },
-                            icon = {
-                                Icon(
-                                    imageVector = if (selected) screen.iconFilled else screen.iconOutlined,
-                                    contentDescription = screen.label
-                                )
-                            },
+                            icon  = { Icon(if (selected) screen.iconFilled else screen.iconOutlined, screen.label) },
                             label = { Text(screen.label, style = MaterialTheme.typography.labelSmall) },
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor   = FatumColors.Green,
@@ -85,21 +71,28 @@ private fun FatumApp() {
                 }
             }
         }
-    ) { innerPadding ->
+    ) { inner ->
         NavHost(
-            navController    = navController,
+            navController    = nav,
             startDestination = Screen.Home.route,
-            modifier         = Modifier.padding(innerPadding)
+            modifier         = Modifier.padding(inner)
         ) {
             composable(Screen.Home.route) {
-                HomeScreen(onSettingsClick = { navController.navigate(Screen.Settings.route) })
+                DashboardScreen(
+                    onNavigateToHabits  = { nav.navigate(Screen.Habits.route) },
+                    onNavigateToTasks   = { nav.navigate(Screen.Tasks.route) },
+                    onNavigateToGoals   = { nav.navigate(Screen.Goals.route) },
+                    onNavigateToAgenda  = { nav.navigate(Screen.Agenda.route) },
+                    onNavigateToFocus   = { nav.navigate(Screen.Focus.route) },
+                    onNavigateToProfile = { nav.navigate(Screen.Profile.route) }
+                )
             }
-            composable(Screen.Habits.route)    { HabitsScreen() }
-            composable(Screen.Planner.route)   { PlannerScreen() }
-            composable(Screen.Goals.route)     { GoalsScreen() }
-            composable(Screen.Focus.route)     { FocusScreen() }
-            composable(Screen.Analytics.route) { AnalyticsScreen() }
-            composable(Screen.Settings.route)  { SettingsScreen() }
+            composable(Screen.Habits.route)  { HabitsScreen() }
+            composable(Screen.Tasks.route)   { TasksScreen() }
+            composable(Screen.Goals.route)   { GoalsScreen() }
+            composable(Screen.Agenda.route)  { PlannerScreen() }
+            composable(Screen.Focus.route)   { FocusScreen(onBack = { nav.popBackStack() }) }
+            composable(Screen.Profile.route) { ProfileScreen(onBack = { nav.popBackStack() }) }
         }
     }
 }
