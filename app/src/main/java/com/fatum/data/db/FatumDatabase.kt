@@ -15,7 +15,7 @@ import com.fatum.data.db.entities.*
         CalendarEventEntity::class,
         FocusSessionEntity::class
     ],
-    version = 2,          // bumped from 1 — schema changed significantly
+    version = 3,
     exportSchema = false
 )
 abstract class FatumDatabase : RoomDatabase() {

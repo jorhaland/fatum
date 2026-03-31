@@ -92,15 +92,15 @@ class HabitsViewModel @Inject constructor(
 
     fun observeExecutions(id: Int) = repo.observeExecutions(id)
 
-    fun toggleBoolean(id: Int) = viewModelScope.launch { repo.toggleBoolean(id, _selectedDate.value) }
+    fun toggleBoolean(id: Int) = viewModelScope.launch(Dispatchers.IO) { repo.toggleBoolean(id, _selectedDate.value) }
 
-    fun logValue(id: Int, delta: Int) = viewModelScope.launch { repo.logValue(id, _selectedDate.value, delta) }
+    fun logValue(id: Int, delta: Int) = viewModelScope.launch(Dispatchers.IO) { repo.logValue(id, _selectedDate.value, delta) }
 
     fun addHabit(name: String, type: String, valueTarget: Int, freqType: String, freqTarget: Int) =
-        viewModelScope.launch { repo.addHabit(name, type, valueTarget, freqType, freqTarget) }
+        viewModelScope.launch(Dispatchers.IO) { repo.addHabit(name, type, valueTarget, freqType, freqTarget) }
 
-    fun updateHabit(h: HabitEntity) = viewModelScope.launch { repo.updateHabit(h) }
-    fun deleteHabit(id: Int)        = viewModelScope.launch { repo.deleteHabit(id) }
+    fun updateHabit(h: HabitEntity) = viewModelScope.launch(Dispatchers.IO) { repo.updateHabit(h) }
+    fun deleteHabit(id: Int)        = viewModelScope.launch(Dispatchers.IO) { repo.deleteHabit(id) }
 
     suspend fun getHeatmap(id: Int) = repo.getHeatmap(id)
 }
@@ -122,11 +122,11 @@ class TasksViewModel @Inject constructor(
     var showCompleted by androidx.compose.runtime.mutableStateOf(false)
 
     fun add(title: String, desc: String?, priority: String, due: Long?) =
-        viewModelScope.launch { repo.add(title, desc, priority, due) }
+        viewModelScope.launch(Dispatchers.IO) { repo.add(title, desc, priority, due) }
 
-    fun toggle(task: TaskEntity)  = viewModelScope.launch { repo.toggle(task) }
-    fun update(task: TaskEntity)  = viewModelScope.launch { repo.update(task) }
-    fun delete(task: TaskEntity)  = viewModelScope.launch { repo.delete(task) }
+    fun toggle(task: TaskEntity)  = viewModelScope.launch(Dispatchers.IO) { repo.toggle(task) }
+    fun update(task: TaskEntity)  = viewModelScope.launch(Dispatchers.IO) { repo.update(task) }
+    fun delete(task: TaskEntity)  = viewModelScope.launch(Dispatchers.IO) { repo.delete(task) }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -144,15 +144,15 @@ class GoalsViewModel @Inject constructor(
 
     fun addGoal(title: String, desc: String?, priority: String, deadline: Long?,
                 goalType: String, targetValue: Float) =
-        viewModelScope.launch { repo.addGoal(title, desc, priority, deadline, goalType, targetValue) }
+        viewModelScope.launch(Dispatchers.IO) { repo.addGoal(title, desc, priority, deadline, goalType, targetValue) }
 
-    fun deleteGoal(g: GoalEntity)      = viewModelScope.launch { repo.deleteGoal(g) }
-    fun updateGoal(g: GoalEntity)      = viewModelScope.launch { repo.updateGoal(g) }
-    fun adjustValue(g: GoalEntity, d: Float) = viewModelScope.launch { repo.adjustValue(g, d) }
-    fun setTarget(g: GoalEntity, t: Float)   = viewModelScope.launch { repo.setTargetValue(g, t) }
-    fun addMilestone(gid: Int, title: String) = viewModelScope.launch { repo.addMilestone(gid, title) }
-    fun toggleMilestone(m: MilestoneEntity)   = viewModelScope.launch { repo.toggleMilestone(m) }
-    fun deleteMilestone(m: MilestoneEntity)   = viewModelScope.launch { repo.deleteMilestone(m) }
+    fun deleteGoal(g: GoalEntity)      = viewModelScope.launch(Dispatchers.IO) { repo.deleteGoal(g) }
+    fun updateGoal(g: GoalEntity)      = viewModelScope.launch(Dispatchers.IO) { repo.updateGoal(g) }
+    fun adjustValue(g: GoalEntity, d: Float) = viewModelScope.launch(Dispatchers.IO) { repo.adjustValue(g, d) }
+    fun setTarget(g: GoalEntity, t: Float)   = viewModelScope.launch(Dispatchers.IO) { repo.setTargetValue(g, t) }
+    fun addMilestone(gid: Int, title: String) = viewModelScope.launch(Dispatchers.IO) { repo.addMilestone(gid, title) }
+    fun toggleMilestone(m: MilestoneEntity)   = viewModelScope.launch(Dispatchers.IO) { repo.toggleMilestone(m) }
+    fun deleteMilestone(m: MilestoneEntity)   = viewModelScope.launch(Dispatchers.IO) { repo.deleteMilestone(m) }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -186,10 +186,10 @@ class PlannerViewModel @Inject constructor(
 
     fun addEvent(title: String, desc: String?, importance: String,
                  start: Long, end: Long, rrule: String?) =
-        viewModelScope.launch { repo.addEvent(title, desc, importance, start, end, rrule) }
+        viewModelScope.launch(Dispatchers.IO) { repo.addEvent(title, desc, importance, start, end, rrule) }
 
-    fun updateEvent(event: CalendarEventEntity) = viewModelScope.launch { repo.update(event) }
-    fun deleteEvent(event: CalendarEventEntity) = viewModelScope.launch { repo.delete(event) }
+    fun updateEvent(event: CalendarEventEntity) = viewModelScope.launch(Dispatchers.IO) { repo.update(event) }
+    fun deleteEvent(event: CalendarEventEntity) = viewModelScope.launch(Dispatchers.IO) { repo.delete(event) }
 
     fun syncCalendar() = viewModelScope.launch(Dispatchers.IO) {
         if (_syncState.value == SyncState.SYNCING) return@launch
@@ -267,13 +267,13 @@ class FocusViewModel @Inject constructor(
 
     fun tick(d: Long) { val r = (_rem.value - d).coerceAtLeast(0L); _rem.value = r; if (r == 0L) finish(true) }
 
-    fun interrupt() = viewModelScope.launch {
+    fun interrupt() = viewModelScope.launch(Dispatchers.IO) {
         _state.value = TimerState.IDLE
         val end = System.currentTimeMillis()
         repo.save(startTs, end, ((end - startTs) / 60_000).toInt().coerceAtLeast(1), false)
     }
 
-    fun finish(completed: Boolean) = viewModelScope.launch {
+    fun finish(completed: Boolean) = viewModelScope.launch(Dispatchers.IO) {
         _state.value = TimerState.FINISHED
         repo.save(startTs, System.currentTimeMillis(), _dur.value, completed)
     }

@@ -80,10 +80,35 @@ private fun FatumApp() {
         ) {
             composable(Screen.Home.route) {
                 DashboardScreen(
-                    onNavigateToHabits  = { nav.navigate(Screen.Habits.route) },
-                    onNavigateToTasks   = { nav.navigate(Screen.Tasks.route) },
-                    onNavigateToGoals   = { nav.navigate(Screen.Goals.route) },
-                    onNavigateToAgenda  = { nav.navigate(Screen.Agenda.route) },
+                    onNavigateToHabits  = {
+                        nav.navigate(Screen.Habits.route) {
+                            popUpTo(nav.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true
+                            restoreState    = true
+                        }
+                    },
+                    onNavigateToTasks   = {
+                        nav.navigate(Screen.Tasks.route) {
+                            popUpTo(nav.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true
+                            restoreState    = true
+                        }
+                    },
+                    onNavigateToGoals   = {
+                        nav.navigate(Screen.Goals.route) {
+                            popUpTo(nav.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true
+                            restoreState    = true
+                        }
+                    },
+                    onNavigateToAgenda  = {
+                        nav.navigate(Screen.Agenda.route) {
+                            popUpTo(nav.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true
+                            restoreState    = true
+                        }
+                    },
+                    // Focus y Profile no están en el menú inferior, así que navigate simple es correcto
                     onNavigateToFocus   = { nav.navigate(Screen.Focus.route) },
                     onNavigateToProfile = { nav.navigate(Screen.Profile.route) }
                 )
