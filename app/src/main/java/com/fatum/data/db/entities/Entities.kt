@@ -30,8 +30,18 @@ data class HabitEntity(
 // ─────────────────────────────────────────────────────────────────────────────
 @Entity(
     tableName = "habit_executions",
-    foreignKeys = [ForeignKey(HabitEntity::class, ["id"], ["habit_id"], onDelete = ForeignKey.CASCADE)],
-    indices    = [Index("habit_id"), Index(["habit_id","date_completed"], unique = true)]
+    foreignKeys = [
+        ForeignKey(
+            entity = HabitEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["habit_id"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [
+        Index(value = ["habit_id"]),
+        Index(value = ["habit_id", "date_completed"], unique = true)
+    ]
 )
 data class HabitExecutionEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
@@ -84,8 +94,15 @@ data class GoalEntity(
 // ─────────────────────────────────────────────────────────────────────────────
 @Entity(
     tableName   = "milestones",
-    foreignKeys = [ForeignKey(GoalEntity::class, ["id"], ["goal_id"], onDelete = ForeignKey.CASCADE)],
-    indices     = [Index("goal_id")]
+    foreignKeys = [
+        ForeignKey(
+            entity = GoalEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["goal_id"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices     = [Index(value = ["goal_id"])]
 )
 data class MilestoneEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
@@ -100,7 +117,7 @@ data class MilestoneEntity(
 // ─────────────────────────────────────────────────────────────────────────────
 @Entity(
     tableName = "calendar_events",
-    indices   = [Index("start_timestamp")]
+    indices   = [Index(value = ["start_timestamp"])]
 )
 data class CalendarEventEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,

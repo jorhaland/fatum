@@ -22,7 +22,8 @@ import kotlinx.coroutines.launch
 import java.time.*
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
-
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 private val D = DateTimeFormatter.ofPattern("yyyy-MM-dd")
 private fun today() = LocalDate.now().format(D)
 

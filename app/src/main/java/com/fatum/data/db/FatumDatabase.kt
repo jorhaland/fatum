@@ -16,7 +16,7 @@ import com.fatum.data.db.entities.*
         FocusSessionEntity::class
     ],
     version = 2,          // bumped from 1 — schema changed significantly
-    exportSchema = true
+    exportSchema = false
 )
 abstract class FatumDatabase : RoomDatabase() {
     abstract fun habitDao(): HabitDao

@@ -78,11 +78,28 @@ fun FocusScreen(
                         val inset  = stroke / 2
                         val sz     = Size(size.width - stroke, size.height - stroke)
                         val tl     = Offset(inset, inset)
-                        drawArc(FatumColors.SurfaceVariant, -90f, 360f, false, Stroke(stroke, cap = StrokeCap.Round), sz, tl)
-                        if (sweep > 0f) drawArc(
-                            Brush.sweepGradient(listOf(FatumColors.GreenDim, FatumColors.Green)),
-                            -90f, sweep, false, Stroke(stroke, cap = StrokeCap.Round), sz, tl
+
+                        drawArc(
+                            color = FatumColors.SurfaceVariant,
+                            startAngle = -90f,
+                            sweepAngle = 360f,
+                            useCenter = false,
+                            topLeft = tl,
+                            size = sz,
+                            style = Stroke(stroke, cap = StrokeCap.Round)
                         )
+
+                        if (sweep > 0f) {
+                            drawArc(
+                                brush = Brush.sweepGradient(listOf(FatumColors.GreenDim, FatumColors.Green)),
+                                startAngle = -90f,
+                                sweepAngle = sweep,
+                                useCenter = false,
+                                topLeft = tl,
+                                size = sz,
+                                style = Stroke(stroke, cap = StrokeCap.Round)
+                            )
+                        }
                     }
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(fmtMs(rem), style = MaterialTheme.typography.displayLarge, color = FatumColors.TextPrimary)
@@ -91,7 +108,7 @@ fun FocusScreen(
                             FocusViewModel.TimerState.FINISHED -> "¡COMPLETADO!"
                             else -> "${dur}m"
                         }, style = MaterialTheme.typography.labelLarge,
-                           color = if (running) FatumColors.Green else FatumColors.TextMuted)
+                            color = if (running) FatumColors.Green else FatumColors.TextMuted)
                     }
                 }
             }
@@ -122,13 +139,15 @@ fun FocusScreen(
                 }
             }
 
-            if (running) item {
-                FatumCard(Modifier.fillMaxWidth(), highlight = true) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text("🔒", style = MaterialTheme.typography.titleLarge)
-                        Column {
-                            Text("Redes sociales bloqueadas", style = MaterialTheme.typography.titleSmall, color = FatumColors.Green)
-                            Text("Instagram, X y TikTok restringidos.", style = MaterialTheme.typography.bodySmall, color = FatumColors.TextMuted)
+            if (running) {
+                item {
+                    FatumCard(Modifier.fillMaxWidth(), highlight = true) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text("🔒", style = MaterialTheme.typography.titleLarge)
+                            Column {
+                                Text("Redes sociales bloqueadas", style = MaterialTheme.typography.titleSmall, color = FatumColors.Green)
+                                Text("Instagram, X y TikTok restringidos.", style = MaterialTheme.typography.bodySmall, color = FatumColors.TextMuted)
+                            }
                         }
                     }
                 }
@@ -153,12 +172,12 @@ fun FocusScreen(
                                 Column {
                                     Text("${s.durationMinutes} min", style = MaterialTheme.typography.titleSmall, color = FatumColors.TextPrimary)
                                     Text(SimpleDateFormat("d MMM, HH:mm", Locale("es")).format(Date(s.startTimestamp)),
-                                         style = MaterialTheme.typography.labelSmall, color = FatumColors.TextMuted)
+                                        style = MaterialTheme.typography.labelSmall, color = FatumColors.TextMuted)
                                 }
                             }
                             Text(if (s.status == "COMPLETED") "Completada" else "Interrumpida",
-                                 style = MaterialTheme.typography.labelMedium,
-                                 color = if (s.status == "COMPLETED") FatumColors.Green else FatumColors.Error)
+                                style = MaterialTheme.typography.labelMedium,
+                                color = if (s.status == "COMPLETED") FatumColors.Green else FatumColors.Error)
                         }
                     }
                 }
@@ -169,9 +188,11 @@ fun FocusScreen(
 }
 
 private fun fmtMs(ms: Long) = "%02d:%02d".format(ms / 60_000, (ms % 60_000) / 1_000)
+
 private fun startBlocker(ctx: Context) = runCatching {
     ctx.startForegroundService(Intent(ctx, AppBlockerOverlayService::class.java).apply { action = AppBlockerOverlayService.ACTION_START })
 }
+
 private fun stopBlocker(ctx: Context) = runCatching {
     ctx.startService(Intent(ctx, AppBlockerOverlayService::class.java).apply { action = AppBlockerOverlayService.ACTION_STOP })
 }
