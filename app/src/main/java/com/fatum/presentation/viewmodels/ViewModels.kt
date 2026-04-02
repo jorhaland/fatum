@@ -57,7 +57,8 @@ class DashboardViewModel @Inject constructor(
         val to     = now.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli() - 1
         val todayStr = today()
 
-        val events  = calRepo.getInRange(from, to)
+        // Filtramos usando ocurreOn para que salgan los recurrentes
+        val events  = calRepo.getInRange(from, to).filter { it.occursOn(now) }
         val habits  = habitRepo.observeActive().first()
         val doneIds = habits.map { h ->
             h.id to (habitRepo.observeExecutions(h.id).first()
@@ -178,7 +179,9 @@ class PlannerViewModel @Inject constructor(
         .flatMapLatest { d ->
             val from = d.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
             val to   = d.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli() - 1
-            repo.observeInRange(from, to)
+            repo.observeInRange(from, to).map { events ->
+                events.filter { it.occursOn(d) }
+            }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 

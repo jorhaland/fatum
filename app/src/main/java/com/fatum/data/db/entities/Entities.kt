@@ -1,6 +1,10 @@
 package com.fatum.data.db.entities
 
 import androidx.room.*
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 @Entity(tableName = "habits")
 data class HabitEntity(
@@ -109,3 +113,32 @@ data class FocusSessionEntity(
     @ColumnInfo("duration_minutes")  val durationMinutes: Int,
     @ColumnInfo("status")            val status: String
 )
+
+fun CalendarEventEntity.occursOn(targetDate: LocalDate): Boolean {
+    val startDate = Instant.ofEpochMilli(this.startTimestamp).atZone(ZoneId.systemDefault()).toLocalDate()
+
+    // Si no es recurrente, debe coincidir exactamente el día
+    if (this.recurrenceRule.isNullOrBlank()) {
+        return startDate == targetDate
+    }
+
+    // Si el evento empieza en el futuro, aún no ocurre
+    if (startDate.isAfter(targetDate)) return false
+
+    // Comprobar si ya superó la fecha límite (UNTIL)
+    val untilStr = this.recurrenceRule.substringAfter("UNTIL=", "").substringBefore(";")
+    if (untilStr.isNotEmpty()) {
+        try {
+            val untilDate = LocalDate.parse(untilStr.substring(0, 8), DateTimeFormatter.ofPattern("yyyyMMdd"))
+            if (targetDate.isAfter(untilDate)) return false
+        } catch (e: Exception) {}
+    }
+
+    // Evaluar la regla de recurrencia
+    return when {
+        this.recurrenceRule.contains("FREQ=DAILY") -> true
+        this.recurrenceRule.contains("FREQ=WEEKLY") -> startDate.dayOfWeek == targetDate.dayOfWeek
+        this.recurrenceRule.contains("FREQ=MONTHLY") -> startDate.dayOfMonth == targetDate.dayOfMonth
+        else -> false
+    }
+}

@@ -153,10 +153,20 @@ interface CalendarEventDao {
     @Update                                          suspend fun update(e: CalendarEventEntity)
     @Delete                                          suspend fun delete(e: CalendarEventEntity)
 
-    @Query("SELECT * FROM calendar_events WHERE start_timestamp BETWEEN :from AND :to ORDER BY start_timestamp ASC")
+    @Query("""
+        SELECT * FROM calendar_events 
+        WHERE (start_timestamp BETWEEN :from AND :to) 
+           OR (recurrence_rule IS NOT NULL AND start_timestamp <= :to) 
+        ORDER BY start_timestamp ASC
+    """)
     fun observeInRange(from: Long, to: Long): Flow<List<CalendarEventEntity>>
 
-    @Query("SELECT * FROM calendar_events WHERE start_timestamp BETWEEN :from AND :to ORDER BY start_timestamp ASC")
+    @Query("""
+        SELECT * FROM calendar_events 
+        WHERE (start_timestamp BETWEEN :from AND :to) 
+           OR (recurrence_rule IS NOT NULL AND start_timestamp <= :to) 
+        ORDER BY start_timestamp ASC
+    """)
     suspend fun getInRange(from: Long, to: Long): List<CalendarEventEntity>
 
     @Query("SELECT * FROM calendar_events WHERE id=:id LIMIT 1")
