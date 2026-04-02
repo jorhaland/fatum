@@ -137,7 +137,7 @@ class GoalsViewModel @Inject constructor(
     private val repo: GoalRepository
 ) : ViewModel() {
 
-    val goals: StateFlow<List<GoalEntity>> = repo.observeActive()
+    val goals: StateFlow<List<GoalEntity>> = repo.observeAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun observeMilestones(gid: Int) = repo.observeMilestones(gid)
@@ -263,9 +263,28 @@ class FocusViewModel @Inject constructor(
 
     fun setDuration(m: Int) { _dur.value = m; _rem.value = m * 60_000L }
 
-    fun startSession() { startTs = System.currentTimeMillis(); _rem.value = _dur.value * 60_000L; _state.value = TimerState.RUNNING }
+    fun startSession() {
+        startTs = System.currentTimeMillis()
+        _rem.value = _dur.value * 60_000L
+        _state.value = TimerState.RUNNING
 
-    fun tick(d: Long) { val r = (_rem.value - d).coerceAtLeast(0L); _rem.value = r; if (r == 0L) finish(true) }
+        // El reloj corre en segundo plano en el ViewModel, a prueba de minimizados
+        viewModelScope.launch(Dispatchers.IO) {
+            while (_state.value == TimerState.RUNNING) {
+                delay(1000)
+                val elapsed = System.currentTimeMillis() - startTs
+                val remaining = (_dur.value * 60_000L) - elapsed
+
+                if (remaining <= 0) {
+                    finish(true)
+                } else {
+                    _rem.value = remaining
+                }
+            }
+        }
+    }
+
+    fun tick(d: Long) { /* Ya no se usa desde la UI, se hace automático arriba */ }
 
     fun interrupt() = viewModelScope.launch(Dispatchers.IO) {
         _state.value = TimerState.IDLE

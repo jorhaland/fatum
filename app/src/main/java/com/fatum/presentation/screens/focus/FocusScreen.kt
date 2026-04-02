@@ -51,9 +51,6 @@ fun FocusScreen(
     val usageLauncher   = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { }
 
     LaunchedEffect(state) {
-        while (state == FocusViewModel.TimerState.RUNNING) { delay(1_000); vm.tick(1_000) }
-    }
-    LaunchedEffect(state) {
         when(state) {
             FocusViewModel.TimerState.RUNNING  -> startBlocker(context)
             else                               -> stopBlocker(context)

@@ -28,14 +28,6 @@ import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ServiceLifecycleOwner
-//
-// BUG FIX: ComposeView inside a Service requires all three ViewTree owners:
-//   setViewTreeLifecycleOwner        ✓ (was set before)
-//   setViewTreeViewModelStoreOwner   ✓ (was set to null before)
-//   setViewTreeSavedStateRegistryOwner ← WAS MISSING → caused NPE crash
-//
-// This class provides a minimal Lifecycle + SavedStateRegistry that
-// satisfies Compose's requirements inside a Service context.
 // ─────────────────────────────────────────────────────────────────────────────
 private class ServiceLifecycleOwner : SavedStateRegistryOwner {
     private val lifecycleRegistry = LifecycleRegistry(this)
@@ -63,7 +55,7 @@ private class ServiceLifecycleOwner : SavedStateRegistryOwner {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// AppBlockerOverlayService  –  RF-5.2 / RF-5.3 / RF-5.4
+// AppBlockerOverlayService
 // ─────────────────────────────────────────────────────────────────────────────
 class AppBlockerOverlayService : Service() {
 
@@ -82,9 +74,17 @@ class AppBlockerOverlayService : Service() {
 
     private var windowManager: WindowManager? = null
     private var overlayView: View? = null
-
-    // One lifecycle owner per service instance; reused for each overlay shown.
     private val composeLifecycleOwner = ServiceLifecycleOwner()
+
+    // 📡 Receptor que escucha las alertas del monitor de uso
+    private val overlayReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == "com.fatum.ACTION_SHOW_OVERLAY") {
+                val appName = intent.getStringExtra("app_name") ?: "La app"
+                showOverlay(appName)
+            }
+        }
+    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -93,6 +93,14 @@ class AppBlockerOverlayService : Service() {
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         composeLifecycleOwner.handleCreate()
         createNotificationChannel()
+
+        // 📡 Encendemos la "radio"
+        val filter = android.content.IntentFilter("com.fatum.ACTION_SHOW_OVERLAY")
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(overlayReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(overlayReceiver, filter)
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -105,19 +113,18 @@ class AppBlockerOverlayService : Service() {
 
     private fun startBlocking() {
         startForeground(NOTIF_ID, buildNotification())
-        // AÑADE ESTA LÍNEA PARA ARRANCAR EL MONITOR
+        // Arrancamos el monitor de uso en segundo plano
         startService(Intent(this, UsageMonitorService::class.java))
     }
 
     private fun stopBlocking() {
         hideOverlay()
-        // AÑADE ESTA LÍNEA PARA APAGAR EL MONITOR
+        // Apagamos el monitor de uso
         stopService(Intent(this, UsageMonitorService::class.java))
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
 
-    /** Shows the intervention screen over a blocked app (RF-5.3). */
     fun showOverlay(blockedAppName: String) {
         if (overlayView != null) return
         val params = WindowManager.LayoutParams(
@@ -130,9 +137,6 @@ class AppBlockerOverlayService : Service() {
         composeLifecycleOwner.handleResume()
 
         overlayView = ComposeView(this).apply {
-            // FIX: All three ViewTree owners must be set before setContent.
-            // Missing setViewTreeSavedStateRegistryOwner caused an NPE crash
-            // when the overlay was shown during a Deep Work session.
             setViewTreeLifecycleOwner(composeLifecycleOwner)
             setViewTreeViewModelStoreOwner(null)
             setViewTreeSavedStateRegistryOwner(composeLifecycleOwner)
@@ -162,6 +166,8 @@ class AppBlockerOverlayService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        // 📡 Apagamos la "radio" para evitar fugas de memoria
+        unregisterReceiver(overlayReceiver)
         hideOverlay()
         composeLifecycleOwner.handleDestroy()
     }
@@ -186,7 +192,7 @@ class AppBlockerOverlayService : Service() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Overlay UI (RF-5.3)
+// Overlay UI
 // ─────────────────────────────────────────────────────────────────────────────
 @Composable
 private fun BlockerOverlayContent(appName: String, onInterrupt: () -> Unit) {
@@ -234,7 +240,7 @@ private fun BlockerOverlayContent(appName: String, onInterrupt: () -> Unit) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// UsageMonitorService  –  RF-5.2
+// UsageMonitorService
 // ─────────────────────────────────────────────────────────────────────────────
 class UsageMonitorService : Service() {
 
@@ -269,20 +275,34 @@ class UsageMonitorService : Service() {
     private fun checkForegroundApp() {
         val usm = getSystemService(Context.USAGE_STATS_SERVICE) as android.app.usage.UsageStatsManager
         val now = System.currentTimeMillis()
-        val stats = usm.queryUsageStats(
-            android.app.usage.UsageStatsManager.INTERVAL_DAILY,
-            now - 5_000, now
-        )
-        val topPackage = stats?.maxByOrNull { it.lastTimeUsed }?.packageName ?: return
-        if (topPackage in AppBlockerOverlayService.BLOCKED_PACKAGES) {
+        // Escaneamos exactamente los eventos del último minuto
+        val events = usm.queryEvents(now - 60_000, now)
+        val event = android.app.usage.UsageEvents.Event()
+        var currentApp = ""
+
+        // Buscamos cuál fue la última app en abrirse (RESUMED) y no cerrarse (PAUSED)
+        while (events.hasNextEvent()) {
+            events.getNextEvent(event)
+            if (event.eventType == android.app.usage.UsageEvents.Event.ACTIVITY_RESUMED) {
+                currentApp = event.packageName
+            } else if (event.eventType == android.app.usage.UsageEvents.Event.ACTIVITY_PAUSED) {
+                if (currentApp == event.packageName) {
+                    currentApp = "" // La app se fue al fondo
+                }
+            }
+        }
+
+        if (currentApp in AppBlockerOverlayService.BLOCKED_PACKAGES) {
             val appLabel = try {
-                packageManager.getApplicationLabel(
-                    packageManager.getApplicationInfo(topPackage, 0)
-                ).toString()
-            } catch (_: Exception) { topPackage }
-            sendBroadcast(Intent("com.fatum.ACTION_SHOW_OVERLAY").apply {
+                packageManager.getApplicationLabel(packageManager.getApplicationInfo(currentApp, 0)).toString()
+            } catch (_: Exception) { "Red Social" }
+
+            // Forzamos el paquete para que Android 14 no bloquee el aviso interno
+            val intent = Intent("com.fatum.ACTION_SHOW_OVERLAY").apply {
+                setPackage(packageName)
                 putExtra("app_name", appLabel)
-            })
+            }
+            sendBroadcast(intent)
         }
     }
 
