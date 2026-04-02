@@ -62,7 +62,7 @@ android {
 
 // ── Versions ────────────────────────────────────────────────────────────────
 ext {
-    compose_bom     = "2024.02.00"
+    compose_bom     = "2024.09.02"
     room_version    = "2.6.1"
     hilt_version    = "2.50"
     lifecycle_ver   = "2.7.0"

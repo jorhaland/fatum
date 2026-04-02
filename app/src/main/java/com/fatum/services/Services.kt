@@ -105,10 +105,14 @@ class AppBlockerOverlayService : Service() {
 
     private fun startBlocking() {
         startForeground(NOTIF_ID, buildNotification())
+        // AÑADE ESTA LÍNEA PARA ARRANCAR EL MONITOR
+        startService(Intent(this, UsageMonitorService::class.java))
     }
 
     private fun stopBlocking() {
         hideOverlay()
+        // AÑADE ESTA LÍNEA PARA APAGAR EL MONITOR
+        stopService(Intent(this, UsageMonitorService::class.java))
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }

@@ -1,7 +1,12 @@
 package com.fatum.presentation.screens.focus
 
+import android.app.AppOpsManager
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -41,6 +46,10 @@ fun FocusScreen(
     val sessions by vm.sessions.collectAsStateWithLifecycle()
     val context  = LocalContext.current
 
+    // Lanzadores para abrir los ajustes si faltan permisos
+    val overlayLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { }
+    val usageLauncher   = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { }
+
     LaunchedEffect(state) {
         while (state == FocusViewModel.TimerState.RUNNING) { delay(1_000); vm.tick(1_000) }
     }
@@ -52,7 +61,7 @@ fun FocusScreen(
     }
 
     val totalMs = dur * 60_000L
-    val sweep   = if (totalMs > 0) (rem.toFloat() / totalMs) * 360f else 0f
+    val sweep = if (totalMs > 0) ((rem.toFloat() / totalMs) * 360f).coerceIn(0f, 360f) else 0f
     val running = state == FocusViewModel.TimerState.RUNNING
 
     Scaffold(
@@ -89,7 +98,7 @@ fun FocusScreen(
                             style = Stroke(stroke, cap = StrokeCap.Round)
                         )
 
-                        if (sweep > 0f) {
+                        if (sweep > 0f && !sweep.isNaN()) {
                             drawArc(
                                 brush = Brush.sweepGradient(listOf(FatumColors.GreenDim, FatumColors.Green)),
                                 startAngle = -90f,
@@ -125,7 +134,18 @@ fun FocusScreen(
                 when (state) {
                     FocusViewModel.TimerState.IDLE, FocusViewModel.TimerState.FINISHED ->
                         FatumButton(if (state == FocusViewModel.TimerState.FINISHED) "Nueva sesión" else "Iniciar",
-                            onClick = { vm.startSession() }, modifier = Modifier.fillMaxWidth(.6f),
+                            onClick = {
+                                // COMPROBACIÓN AUTOMÁTICA DE PERMISOS
+                                if (!Settings.canDrawOverlays(context)) {
+                                    val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${context.packageName}"))
+                                    overlayLauncher.launch(intent)
+                                } else if (!hasUsageStatsPermission(context)) {
+                                    val intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
+                                    usageLauncher.launch(intent)
+                                } else {
+                                    vm.startSession()
+                                }
+                            }, modifier = Modifier.fillMaxWidth(.6f),
                             icon = { Icon(Icons.Default.PlayArrow, null, tint = Color(0xFF0F1117), modifier = Modifier.size(20.dp)) })
                     FocusViewModel.TimerState.RUNNING ->
                         OutlinedButton(onClick = { vm.interrupt() },
@@ -188,6 +208,18 @@ fun FocusScreen(
 }
 
 private fun fmtMs(ms: Long) = "%02d:%02d".format(ms / 60_000, (ms % 60_000) / 1_000)
+
+// Función auxiliar para comprobar permiso de uso de aplicaciones
+private fun hasUsageStatsPermission(context: Context): Boolean {
+    val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
+    val mode = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+        appOps.unsafeCheckOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, android.os.Process.myUid(), context.packageName)
+    } else {
+        @Suppress("DEPRECATION")
+        appOps.checkOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, android.os.Process.myUid(), context.packageName)
+    }
+    return mode == AppOpsManager.MODE_ALLOWED
+}
 
 private fun startBlocker(ctx: Context) = runCatching {
     ctx.startForegroundService(Intent(ctx, AppBlockerOverlayService::class.java).apply { action = AppBlockerOverlayService.ACTION_START })
