@@ -1,9 +1,10 @@
 package com.fatum.presentation.screens.focus
 
-import android.app.AppOpsManager
+import android.Manifest
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
+import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -27,39 +28,28 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.fatum.presentation.components.*
-import com.fatum.services.AppBlockerOverlayService
+import com.fatum.services.FocusTimerCore
+import com.fatum.services.FocusTimerService
 import com.fatum.presentation.theme.FatumColors
 import com.fatum.presentation.viewmodels.FocusViewModel
-import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FocusScreen(
-    onBack: () -> Unit,
-    vm: FocusViewModel = hiltViewModel()
-) {
+fun FocusScreen(onBack: () -> Unit, vm: FocusViewModel = hiltViewModel()) {
     val state    by vm.state.collectAsStateWithLifecycle()
     val rem      by vm.remainingMs.collectAsStateWithLifecycle()
     val dur      by vm.durationMinutes.collectAsStateWithLifecycle()
     val sessions by vm.sessions.collectAsStateWithLifecycle()
     val context  = LocalContext.current
 
-    // Lanzadores para abrir los ajustes si faltan permisos
-    val overlayLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { }
     val usageLauncher   = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { }
-
-    LaunchedEffect(state) {
-        when(state) {
-            FocusViewModel.TimerState.RUNNING  -> startBlocker(context)
-            else                               -> stopBlocker(context)
-        }
-    }
+    val notifLauncher   = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
     val totalMs = dur * 60_000L
     val sweep = if (totalMs > 0) ((rem.toFloat() / totalMs) * 360f).coerceIn(0f, 360f) else 0f
-    val running = state == FocusViewModel.TimerState.RUNNING
+    val running = state == FocusTimerCore.TimerState.RUNNING
 
     Scaffold(
         containerColor = FatumColors.Background,
@@ -72,10 +62,8 @@ fun FocusScreen(
         }
     ) { padding ->
         LazyColumn(
-            modifier = Modifier.padding(padding).fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            modifier = Modifier.padding(padding).fillMaxSize(), contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item {
                 Box(Modifier.padding(vertical = 16.dp).size(240.dp), contentAlignment = Alignment.Center) {
@@ -83,72 +71,50 @@ fun FocusScreen(
                         val stroke = 14.dp.toPx()
                         val inset  = stroke / 2
                         val sz     = Size(size.width - stroke, size.height - stroke)
-                        val tl     = Offset(inset, inset)
-
-                        drawArc(
-                            color = FatumColors.SurfaceVariant,
-                            startAngle = -90f,
-                            sweepAngle = 360f,
-                            useCenter = false,
-                            topLeft = tl,
-                            size = sz,
-                            style = Stroke(stroke, cap = StrokeCap.Round)
-                        )
-
+                        drawArc(color = FatumColors.SurfaceVariant, startAngle = -90f, sweepAngle = 360f, useCenter = false, topLeft = Offset(inset, inset), size = sz, style = Stroke(stroke, cap = StrokeCap.Round))
                         if (sweep > 0f && !sweep.isNaN()) {
-                            drawArc(
-                                brush = Brush.sweepGradient(listOf(FatumColors.GreenDim, FatumColors.Green)),
-                                startAngle = -90f,
-                                sweepAngle = sweep,
-                                useCenter = false,
-                                topLeft = tl,
-                                size = sz,
-                                style = Stroke(stroke, cap = StrokeCap.Round)
-                            )
+                            drawArc(brush = Brush.sweepGradient(listOf(FatumColors.GreenDim, FatumColors.Green)), startAngle = -90f, sweepAngle = sweep, useCenter = false, topLeft = Offset(inset, inset), size = sz, style = Stroke(stroke, cap = StrokeCap.Round))
                         }
                     }
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(fmtMs(rem), style = MaterialTheme.typography.displayLarge, color = FatumColors.TextPrimary)
                         Text(when(state) {
-                            FocusViewModel.TimerState.RUNNING  -> "EN SESIÓN"
-                            FocusViewModel.TimerState.FINISHED -> "¡COMPLETADO!"
+                            FocusTimerCore.TimerState.RUNNING  -> "EN SESIÓN"
+                            FocusTimerCore.TimerState.FINISHED -> "¡COMPLETADO!"
                             else -> "${dur}m"
-                        }, style = MaterialTheme.typography.labelLarge,
-                            color = if (running) FatumColors.Green else FatumColors.TextMuted)
+                        }, style = MaterialTheme.typography.labelLarge, color = if (running) FatumColors.Green else FatumColors.TextMuted)
                     }
                 }
             }
 
             item {
                 if (!running) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(15, 25, 45, 60, 90).forEach { m ->
-                        FatumChip("${m}m", dur == m, { vm.setDuration(m) })
-                    }
+                    listOf(15, 25, 45, 60, 90).forEach { m -> FatumChip("${m}m", dur == m, { vm.setDuration(m) }) }
                 }
             }
 
             item {
                 when (state) {
-                    FocusViewModel.TimerState.IDLE, FocusViewModel.TimerState.FINISHED ->
-                        FatumButton(if (state == FocusViewModel.TimerState.FINISHED) "Nueva sesión" else "Iniciar",
-                            onClick = {
-                                // COMPROBACIÓN AUTOMÁTICA DE PERMISOS
-                                if (!Settings.canDrawOverlays(context)) {
-                                    val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${context.packageName}"))
-                                    overlayLauncher.launch(intent)
-                                } else if (!hasUsageStatsPermission(context)) {
-                                    val intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
-                                    usageLauncher.launch(intent)
-                                } else {
-                                    vm.startSession()
-                                }
-                            }, modifier = Modifier.fillMaxWidth(.6f),
-                            icon = { Icon(Icons.Default.PlayArrow, null, tint = Color(0xFF0F1117), modifier = Modifier.size(20.dp)) })
-                    FocusViewModel.TimerState.RUNNING ->
-                        OutlinedButton(onClick = { vm.interrupt() },
-                            modifier = Modifier.fillMaxWidth(.7f).height(48.dp), shape = RoundedCornerShape(12.dp),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, FatumColors.Error),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = FatumColors.Error)) {
+                    FocusTimerCore.TimerState.IDLE ->
+                        FatumButton("Iniciar", onClick = {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) }
+                            if (!hasAccessibilityPermission(context)) {
+                                usageLauncher.launch(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                                android.widget.Toast.makeText(context, "Activa FATUM en Accesibilidad", android.widget.Toast.LENGTH_LONG).show()
+                            } else {
+                                vm.startSession()
+                                context.startForegroundService(Intent(context, FocusTimerService::class.java))
+                            }
+                        }, modifier = Modifier.fillMaxWidth(.6f), icon = { Icon(Icons.Default.PlayArrow, null, tint = Color(0xFF0F1117), modifier = Modifier.size(20.dp)) })
+
+                    FocusTimerCore.TimerState.FINISHED ->
+                        FatumButton("Guardar y Nueva sesión", onClick = { vm.finishSessionData() }, modifier = Modifier.fillMaxWidth(.6f))
+
+                    FocusTimerCore.TimerState.RUNNING ->
+                        OutlinedButton(onClick = {
+                            vm.interrupt()
+                            context.startService(Intent(context, FocusTimerService::class.java).apply { action = "STOP" })
+                        }, modifier = Modifier.fillMaxWidth(.7f).height(48.dp), shape = RoundedCornerShape(12.dp), border = androidx.compose.foundation.BorderStroke(1.dp, FatumColors.Error), colors = ButtonDefaults.outlinedButtonColors(contentColor = FatumColors.Error)) {
                             Icon(Icons.Default.Stop, null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(6.dp))
                             Text("Interrumpir sesión")
@@ -188,13 +154,10 @@ fun FocusScreen(
                                 Text(if (s.status == "COMPLETED") "✅" else "⚠️", style = MaterialTheme.typography.bodyLarge)
                                 Column {
                                     Text("${s.durationMinutes} min", style = MaterialTheme.typography.titleSmall, color = FatumColors.TextPrimary)
-                                    Text(SimpleDateFormat("d MMM, HH:mm", Locale("es")).format(Date(s.startTimestamp)),
-                                        style = MaterialTheme.typography.labelSmall, color = FatumColors.TextMuted)
+                                    Text(SimpleDateFormat("d MMM, HH:mm", Locale("es")).format(Date(s.startTimestamp)), style = MaterialTheme.typography.labelSmall, color = FatumColors.TextMuted)
                                 }
                             }
-                            Text(if (s.status == "COMPLETED") "Completada" else "Interrumpida",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = if (s.status == "COMPLETED") FatumColors.Green else FatumColors.Error)
+                            Text(if (s.status == "COMPLETED") "Completada" else "Interrumpida", style = MaterialTheme.typography.labelMedium, color = if (s.status == "COMPLETED") FatumColors.Green else FatumColors.Error)
                         }
                     }
                 }
@@ -206,22 +169,8 @@ fun FocusScreen(
 
 private fun fmtMs(ms: Long) = "%02d:%02d".format(ms / 60_000, (ms % 60_000) / 1_000)
 
-// Función auxiliar para comprobar permiso de uso de aplicaciones
-private fun hasUsageStatsPermission(context: Context): Boolean {
-    val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
-    val mode = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-        appOps.unsafeCheckOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, android.os.Process.myUid(), context.packageName)
-    } else {
-        @Suppress("DEPRECATION")
-        appOps.checkOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, android.os.Process.myUid(), context.packageName)
-    }
-    return mode == AppOpsManager.MODE_ALLOWED
-}
-
-private fun startBlocker(ctx: Context) = runCatching {
-    ctx.startForegroundService(Intent(ctx, AppBlockerOverlayService::class.java).apply { action = AppBlockerOverlayService.ACTION_START })
-}
-
-private fun stopBlocker(ctx: Context) = runCatching {
-    ctx.startService(Intent(ctx, AppBlockerOverlayService::class.java).apply { action = AppBlockerOverlayService.ACTION_STOP })
+private fun hasAccessibilityPermission(context: Context): Boolean {
+    val componentName = ComponentName(context, com.fatum.services.AppBlockerAccessibilityService::class.java)
+    val enabledServices = android.provider.Settings.Secure.getString(context.contentResolver, android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
+    return enabledServices?.contains(componentName.flattenToString()) == true
 }

@@ -283,6 +283,16 @@ private fun EventDialog(
                 }
 
                 item { OutlinedTextField(desc, { desc = it }, label = { Text("Descripción (opcional)") }, modifier = Modifier.fillMaxWidth(), colors = fatumOutlinedFieldColors(), minLines = 2, maxLines = 3) }
+
+                item {
+                    Text("Importancia", style = MaterialTheme.typography.labelLarge, color = FatumColors.TextMuted)
+                    Spacer(Modifier.height(6.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf("HIGH" to "Alta","MEDIUM" to "Media","LOW" to "Baja").forEach { (k, l) ->
+                            FatumChip(l, importance == k, { importance = k })
+                        }
+                    }
+                }
             }
         },
         confirmButton = { FatumButton(if (event == null) "Crear" else "Guardar", enabled = title.isNotBlank(), onClick = {

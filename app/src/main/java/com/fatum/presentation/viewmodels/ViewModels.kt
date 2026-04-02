@@ -245,59 +245,36 @@ class FocusViewModel @Inject constructor(
     private val repo: FocusRepository
 ) : ViewModel() {
 
-    enum class TimerState { IDLE, RUNNING, FINISHED }
-
-    private val _state        = MutableStateFlow(TimerState.IDLE)
-    val state: StateFlow<TimerState> = _state.asStateFlow()
-
-    private val _dur          = MutableStateFlow(25)
-    val durationMinutes: StateFlow<Int> = _dur.asStateFlow()
-
-    private val _rem          = MutableStateFlow(25 * 60_000L)
-    val remainingMs: StateFlow<Long> = _rem.asStateFlow()
-
-    private var startTs = 0L
+    val state = com.fatum.services.FocusTimerCore.state.asStateFlow()
+    val durationMinutes = com.fatum.services.FocusTimerCore.durationMinutes.asStateFlow()
+    val remainingMs = com.fatum.services.FocusTimerCore.remainingMs.asStateFlow()
 
     val sessions = repo.observeAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    fun setDuration(m: Int) { _dur.value = m; _rem.value = m * 60_000L }
-
-    fun startSession() {
-        startTs = System.currentTimeMillis()
-        _rem.value = _dur.value * 60_000L
-        _state.value = TimerState.RUNNING
-
-        // El reloj corre en segundo plano en el ViewModel, a prueba de minimizados
-        viewModelScope.launch(Dispatchers.IO) {
-            while (_state.value == TimerState.RUNNING) {
-                delay(1000)
-                val elapsed = System.currentTimeMillis() - startTs
-                val remaining = (_dur.value * 60_000L) - elapsed
-
-                if (remaining <= 0) {
-                    finish(true)
-                } else {
-                    _rem.value = remaining
-                }
-            }
+    fun setDuration(m: Int) {
+        if (state.value != com.fatum.services.FocusTimerCore.TimerState.RUNNING) {
+            com.fatum.services.FocusTimerCore.durationMinutes.value = m
+            com.fatum.services.FocusTimerCore.remainingMs.value = m * 60_000L
         }
     }
 
-    fun tick(d: Long) { /* Ya no se usa desde la UI, se hace automático arriba */ }
+    fun startSession() {
+        com.fatum.services.FocusTimerCore.startTs = System.currentTimeMillis()
+        com.fatum.services.FocusTimerCore.remainingMs.value = com.fatum.services.FocusTimerCore.durationMinutes.value * 60_000L
+        com.fatum.services.FocusTimerCore.state.value = com.fatum.services.FocusTimerCore.TimerState.RUNNING
+    }
 
     fun interrupt() = viewModelScope.launch(Dispatchers.IO) {
-        _state.value = TimerState.IDLE
+        com.fatum.services.FocusTimerCore.state.value = com.fatum.services.FocusTimerCore.TimerState.IDLE
         val end = System.currentTimeMillis()
-        repo.save(startTs, end, ((end - startTs) / 60_000).toInt().coerceAtLeast(1), false)
+        repo.save(com.fatum.services.FocusTimerCore.startTs, end, ((end - com.fatum.services.FocusTimerCore.startTs) / 60_000).toInt().coerceAtLeast(1), false)
     }
 
-    fun finish(completed: Boolean) = viewModelScope.launch(Dispatchers.IO) {
-        _state.value = TimerState.FINISHED
-        repo.save(startTs, System.currentTimeMillis(), _dur.value, completed)
+    fun finishSessionData() = viewModelScope.launch(Dispatchers.IO) {
+        com.fatum.services.FocusTimerCore.state.value = com.fatum.services.FocusTimerCore.TimerState.IDLE
+        repo.save(com.fatum.services.FocusTimerCore.startTs, System.currentTimeMillis(), com.fatum.services.FocusTimerCore.durationMinutes.value, true)
     }
-
-    fun reset() { _state.value = TimerState.IDLE; _rem.value = _dur.value * 60_000L }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

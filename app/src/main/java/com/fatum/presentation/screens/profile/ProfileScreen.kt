@@ -223,6 +223,48 @@ fun ProfileScreen(
                 }
             }
 
+            item {
+                val context = LocalContext.current
+                val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
+                    uri?.let {
+                        try {
+                            val dbFile = context.getDatabasePath("fatum.db")
+                            if (dbFile.exists()) {
+                                context.contentResolver.openOutputStream(it)?.use { out -> dbFile.inputStream().use { input -> input.copyTo(out) } }
+                                android.widget.Toast.makeText(context, "Exportado con éxito", android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                        } catch (e: Exception) { android.widget.Toast.makeText(context, "Error al exportar", android.widget.Toast.LENGTH_SHORT).show() }
+                    }
+                }
+                val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+                    uri?.let {
+                        try {
+                            val dbFile = context.getDatabasePath("fatum.db")
+                            context.contentResolver.openInputStream(it)?.use { input -> dbFile.outputStream().use { out -> input.copyTo(out) } }
+                            context.getDatabasePath("fatum.db-wal").delete()
+                            context.getDatabasePath("fatum.db-shm").delete()
+                            android.widget.Toast.makeText(context, "Importado. Cierra la app de la multitarea y vuelve a abrirla.", android.widget.Toast.LENGTH_LONG).show()
+                        } catch (e: Exception) { android.widget.Toast.makeText(context, "Error al importar", android.widget.Toast.LENGTH_SHORT).show() }
+                    }
+                }
+
+                FatumCard(Modifier.fillMaxWidth()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("Copias de Seguridad Locales", style = MaterialTheme.typography.titleMedium, color = FatumColors.TextPrimary)
+
+                        FatumButton(
+                            text = "Exportar Datos (Crear archivo)",
+                            onClick = { exportLauncher.launch("fatum_backup.db") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        OutlinedButton(onClick = { importLauncher.launch(arrayOf("application/octet-stream")) }, modifier = Modifier.fillMaxWidth()) {
+                            Text("Importar Datos (Leer archivo)", color = FatumColors.TextPrimary)
+                        }
+                    }
+                }
+            }
+
             item { Spacer(Modifier.height(40.dp)) }
         }
     }

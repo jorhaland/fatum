@@ -51,24 +51,25 @@
             </intent-filter>
         </activity>
 
-        <!-- App Blocker Overlay Service -->
         <service
-            android:name=".services.AppBlockerOverlayService"
-            android:exported="false"
-            android:foregroundServiceType="specialUse">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="app_blocker_overlay" />
+            android:name=".services.AppBlockerAccessibilityService"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
         </service>
 
-        <!-- Usage Monitor Service -->
         <service
-            android:name=".services.UsageMonitorService"
+            android:name=".services.FocusTimerService"
             android:exported="false"
             android:foregroundServiceType="specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="usage_monitor" />
+                android:value="timer" />
         </service>
 
         <!-- Boot receiver -->
